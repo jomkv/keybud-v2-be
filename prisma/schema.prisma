@@ -13,3 +13,97 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+model User {
+  id         Int         @id @default(autoincrement())
+  googleId   String      @unique
+  username   String      @unique
+  email      String      @unique
+  switchType SwitchType?
+
+  // Relations
+  setting    UserSetting?
+  followers  UserFollow[]   @relation("UserFollows")
+  followings UserFollow[]   @relation("UserFollowing")
+  statuses   Status[]
+  stars      StatusStar[]
+  reposts    StatusRepost[]
+}
+
+model UserSetting {
+  id             Int     @id @default(autoincrement())
+  userId         Int     @unique
+  muteAllNotifs  Boolean @default(false)
+  messagesNotif  Boolean @default(false)
+  followersNotif Boolean @default(false)
+  starsNotif     Boolean @default(false)
+  repostsNotif   Boolean @default(false)
+
+  // Relations
+  user User @relation(fields: [userId], references: [id])
+}
+
+model UserFollow {
+  id              Int @id @default(autoincrement())
+  followerUserId  Int
+  followingUserId Int
+
+  // Relations
+  followerUser  User @relation("UserFollows", fields: [followerUserId], references: [id])
+  followingUser User @relation("UserFollowing", fields: [followingUserId], references: [id])
+}
+
+model Status {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  parentId    Int?
+  title       String
+  description String
+  createdAt   DateTime @default(now())
+  edittedAt   DateTime @updatedAt
+
+  // Relations
+  user     User     @relation(fields: [userId], references: [id])
+  parent   Status?  @relation("StatusReplies", fields: [parentId], references: [id])
+  comments Status[] @relation("StatusReplies")
+
+  attachments Attachment[]
+  stars       StatusStar[]
+  reposts     StatusRepost[]
+}
+
+model Attachment {
+  id       Int    @id @default(autoincrement())
+  statusId Int
+  publicId String @unique
+  url      String
+
+  // Relations 
+  status Status @relation(fields: [statusId], references: [id])
+}
+
+model StatusStar {
+  id       Int @id @default(autoincrement())
+  statusId Int
+  userId   Int
+
+  // Relations
+  status Status @relation(fields: [statusId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+}
+
+model StatusRepost {
+  id       Int @id @default(autoincrement())
+  statusId Int
+  userId   Int
+
+  // Relations
+  status Status @relation(fields: [statusId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+}
+
+enum SwitchType {
+  CLICKY
+  TACTILE
+  LINEAR
+}
