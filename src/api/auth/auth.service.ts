@@ -1,9 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { RedisService } from 'src/redis/redis.service';
-import { AuthGateway } from './gateways/auth.gateway';
+import { AUTH_MESSAGES, AuthGateway } from './gateways/auth.gateway';
 import { UserService } from '../user/user.service';
-import { AuthInput, AuthResult, TokenPayload } from 'src/shared/types/auth';
+import {
+  AuthInput,
+  AuthResult,
+  SessionNonceKey,
+  TokenPayload,
+} from 'src/shared/types/auth';
 import { User } from 'generated/prisma';
 
 @Injectable()
@@ -44,5 +49,22 @@ export class AuthService {
     };
 
     return this.jwtService.signAsync(payload);
+  }
+
+  /**
+   * Emit login success message to client
+   *
+   * @param {string} nonce - Nonce that is associated with a sessionId
+   */
+  async emitSuccess(nonce: string): Promise<void> {
+    const sessionNonceKey: SessionNonceKey = `nonce:${nonce}`;
+    const sessionId = await this.redisService.get(sessionNonceKey);
+
+    if (!sessionId) {
+      console.error(`Session not found from ${sessionNonceKey}`);
+      return;
+    }
+
+    await this.authGateway.emitToSession(sessionId, AUTH_MESSAGES.COMPLETE, {});
   }
 }

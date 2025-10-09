@@ -1,6 +1,6 @@
 import { AuthGuard } from '@nestjs/passport';
 import { Request } from 'express';
-import { RequestService } from 'src/shared/services/request.service';
+import { RequestService } from 'src/request/request.service';
 import { RedisService } from 'src/redis/redis.service';
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { SessionNonceKey } from 'src/shared/types/auth';

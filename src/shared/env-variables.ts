@@ -21,6 +21,10 @@ class EnvironmentVariables {
     return process.env.BASE_URL;
   }
 
+  get clientUrl(): string {
+    return process.env.CLIENT_URL;
+  }
+
   get redisHost(): string {
     return process.env.REDIS_HOST;
   }
