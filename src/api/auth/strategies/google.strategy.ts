@@ -4,7 +4,7 @@ import { Injectable } from '@nestjs/common';
 import EnvironmentVariables from 'src/shared/env-variables';
 
 @Injectable()
-export class AuthStrategy extends PassportStrategy(Strategy) {
+export class GoogleStrategy extends PassportStrategy(Strategy) {
   constructor() {
     super({
       clientID: EnvironmentVariables.clientId,

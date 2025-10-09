@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AuthGateway } from './gateways/auth.gateway';
-import { AuthStrategy } from './strategies/auth.strategy';
+import { GoogleStrategy } from './strategies/google.strategy';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { RedisModule } from 'src/redis/redis.module';
@@ -9,7 +9,7 @@ import { UserModule } from '../user/user.module';
 
 @Module({
   imports: [RedisModule, JwtModule, UserModule],
-  providers: [AuthGateway, AuthStrategy, AuthService],
+  providers: [AuthGateway, GoogleStrategy, AuthService],
   controllers: [AuthController],
 })
 export class AuthModule {}
