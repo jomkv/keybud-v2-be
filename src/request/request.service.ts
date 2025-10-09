@@ -1,5 +1,5 @@
 import { Injectable, Scope } from '@nestjs/common';
-import { TokenPayload } from '../types/auth';
+import { TokenPayload } from '../shared/types/auth';
 
 @Injectable({ scope: Scope.REQUEST })
 export class RequestService {
