@@ -34,7 +34,7 @@ export class AuthGateway implements OnGatewayDisconnect {
     const sessionId: string | null = await this.getSessionBySocket(socket.id);
 
     if (sessionId) {
-      await this.redisService.delete(REDIS_KEYS.SESSION(sessionId));
+      await this.cleanupSession(sessionId, socket.id);
     }
   }
 
@@ -70,25 +70,14 @@ export class AuthGateway implements OnGatewayDisconnect {
   }
 
   /**
-   * Get a socket by sessionId.
+   * Get a socketId by sessionId.
    *
    * @param {string} sessionId - The sessionId from nonce
-   * @returns {Promise<Socket | null>} socketId
+   * @returns {Promise<string | null>} socketId
    */
-  private async getSocketBySession(sessionId: string): Promise<Socket | null> {
+  private async getSocketBySession(sessionId: string): Promise<string | null> {
     try {
-      const socketId = await this.redisService.get(
-        REDIS_KEYS.SESSION(sessionId),
-      );
-
-      const socket = this.server.sockets.sockets.get(socketId);
-
-      if (!socket) {
-        console.error(`Socket ${socketId} not found or disconnected`);
-        return null;
-      }
-
-      return socket;
+      return await this.redisService.get(REDIS_KEYS.SESSION(sessionId));
     } catch (error) {
       console.error('Failed to get socket by session ID:', error);
       return null;
@@ -109,18 +98,38 @@ export class AuthGateway implements OnGatewayDisconnect {
     data: any,
   ): Promise<boolean> {
     try {
-      const socket: Socket | null = await this.getSocketBySession(sessionId);
+      const socketId: string | null = await this.getSocketBySession(sessionId);
 
-      if (!socket) {
-        console.error(`No socket found for session: ${sessionId}`);
+      if (!socketId) {
+        console.error(`No socketId found for session: ${sessionId}`);
         return false;
       }
 
-      socket.emit(event, data);
+      this.server.to(socketId).emit(event, data);
+      await this.cleanupSession(sessionId, socketId);
       return true;
     } catch (error) {
       console.error(`Failed to emit to session ${sessionId}:`, error);
       return false;
+    }
+  }
+
+  /**
+   * Cleans up session mappings from Redis.
+   *
+   * @param {string} sessionId - The session ID to clean up
+   * @param {string} socketId - The socket ID to clean up
+   */
+  private async cleanupSession(
+    sessionId: string,
+    socketId: string,
+  ): Promise<void> {
+    try {
+      await this.redisService.delete(REDIS_KEYS.SESSION(sessionId));
+      await this.redisService.delete(REDIS_KEYS.SOCKET(socketId));
+      console.info(`Session cleanup completed: ${sessionId}`);
+    } catch (error) {
+      console.error('Failed to cleanup session:', error);
     }
   }
 }

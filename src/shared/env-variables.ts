@@ -9,6 +9,10 @@ class EnvironmentVariables {
     return !this.isProd;
   }
 
+  get jwtSecret(): string {
+    return process.env.JWT_SECRET;
+  }
+
   get clientId(): string {
     return process.env.GOOGLE_CLIENT_ID;
   }
