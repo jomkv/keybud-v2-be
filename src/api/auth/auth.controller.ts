@@ -30,7 +30,7 @@ export class AuthController {
   @UseGuards(AuthGuard('google'))
   async googleRedirect(
     @Req() req: Request,
-    @Res({ passthrough: true }) res: Response,
+    @Res() res: Response,
     @Query('state') nonce: string,
   ) {
     const userPayload = req.user as Profile | undefined | null;

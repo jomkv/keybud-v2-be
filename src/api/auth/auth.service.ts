@@ -10,6 +10,7 @@ import {
   TokenPayload,
 } from 'src/shared/types/auth';
 import { User } from 'generated/prisma';
+import EnvironmentVariables from 'src/shared/env-variables';
 
 @Injectable()
 export class AuthService {
@@ -48,7 +49,9 @@ export class AuthService {
       username: username,
     };
 
-    return this.jwtService.signAsync(payload);
+    return this.jwtService.signAsync(payload, {
+      secret: EnvironmentVariables.jwtSecret,
+    });
   }
 
   /**
