@@ -14,7 +14,9 @@ import { AuthGuard } from '@nestjs/passport';
 import { Request, Response } from 'express';
 import { Profile } from 'passport-google-oauth20';
 import EnvironmentVariables from 'src/shared/env-variables';
+import { Public } from 'src/shared/decorators/public.decorator';
 
+@Public()
 @Controller('auth')
 export class AuthController {
   constructor(
