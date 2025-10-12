@@ -1,17 +1,17 @@
 import { Injectable, Scope } from '@nestjs/common';
-import { TokenPayload } from '../shared/types/auth';
+import { User } from 'generated/prisma';
 
 @Injectable({ scope: Scope.REQUEST })
 export class RequestService {
-  private userPayload: TokenPayload;
+  private user: User | null = null;
   private sessionNonce: string | null = null;
 
-  setUserPayload(payload: TokenPayload) {
-    this.userPayload = payload;
+  setUser(user: User) {
+    this.user = user;
   }
 
-  getUserPayload() {
-    return this.userPayload;
+  getUser() {
+    return this.user;
   }
 
   setSessionNonce(nonce: string | null): void {
