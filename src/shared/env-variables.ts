@@ -36,6 +36,22 @@ class EnvironmentVariables {
   get redisPort(): number {
     return process.env.REDIS_PORT as unknown as number;
   }
+
+  get s3Region(): string {
+    return process.env.S3_REGION;
+  }
+
+  get s3Name(): string {
+    return process.env.S3_Name;
+  }
+
+  get s3AccessKey(): string {
+    return process.env.S3_ACCESS_KEY;
+  }
+
+  get s3SecretKey(): string {
+    return process.env.S3_SECRET_KEY;
+  }
 }
 
 export default new EnvironmentVariables();
