@@ -57,7 +57,7 @@ model Status {
   id          Int      @id @default(autoincrement())
   userId      Int
   parentId    Int?
-  title       String
+  title       String?
   description String
   createdAt   DateTime @default(now())
   edittedAt   DateTime @updatedAt
@@ -73,10 +73,10 @@ model Status {
 }
 
 model Attachment {
-  id       Int    @id @default(autoincrement())
-  statusId Int
-  publicId String @unique
-  url      String
+  id        Int      @id @default(autoincrement())
+  statusId  Int
+  key       String   @unique
+  createdAt DateTime @default(now())
 
   // Relations 
   status Status @relation(fields: [statusId], references: [id])
