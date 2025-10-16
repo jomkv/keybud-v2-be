@@ -1,7 +1,10 @@
 import {
+  BadRequestException,
+  Body,
   Controller,
   Get,
   HttpException,
+  Post,
   Query,
   Req,
   Res,
@@ -22,6 +25,32 @@ export class AuthController {
     private readonly requestService: RequestService,
     private readonly authService: AuthService,
   ) {}
+
+  @Public()
+  @Post('dev-login')
+  async devLogin(
+    @Body('email') email: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    if (!email) {
+      throw new BadRequestException(
+        'Please provide email within the request body',
+      );
+    }
+
+    const { accessToken } = await this.authService.devAuthenticate(email);
+
+    res.cookie('access_token', accessToken, {
+      httpOnly: true,
+      secure: EnvironmentVariables.isProd,
+      sameSite: 'strict',
+      maxAge: 24 * 60 * 60 * 1000, // 1 day
+    });
+
+    return {
+      message: 'Dev login success',
+    };
+  }
 
   @Public()
   @Get('google')

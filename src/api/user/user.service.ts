@@ -47,6 +47,10 @@ export class UserService {
     return this.prismaService.user.findUnique({ where: { id } });
   }
 
+  findByEmail(email: string): Promise<User | null> {
+    return this.prismaService.user.findUnique({ where: { email } });
+  }
+
   findByGoogleIdOrEmail(googleId: string, email: string): Promise<User | null> {
     return this.prismaService.user.findFirst({
       where: { OR: [{ googleId }, { email }] },

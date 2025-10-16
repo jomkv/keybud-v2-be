@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { RedisService } from 'src/redis/redis.service';
 import { AUTH_MESSAGES, AuthGateway } from './gateways/auth.gateway';
@@ -29,6 +29,24 @@ export class AuthService {
    */
   async authenticate(input: AuthInput): Promise<AuthResult> {
     const user: User = await this.userService.findOrCreate(input);
+
+    const accessToken = await this.generateAccessToken(user);
+
+    return { accessToken, userId: String(user.id), username: user.username };
+  }
+
+  /**
+   * Authenticates user in dev mode (skips oauth), primarily used within postman.
+   *
+   * @param {string} email - The user email we want to login as.
+   * @returns {Promise<AuthResult>} Authentication result containing accessToken and user information
+   */
+  async devAuthenticate(email: string): Promise<AuthResult> {
+    const user: User = await this.userService.findByEmail(email);
+
+    if (!user) {
+      throw new NotFoundException('Email not found');
+    }
 
     const accessToken = await this.generateAccessToken(user);
 
