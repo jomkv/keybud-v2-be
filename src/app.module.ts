@@ -8,6 +8,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { RequestModule } from './request/request.module';
 import { AuthModule } from './api/auth/auth.module';
 import EnvironmentVariables from './shared/env-variables';
+import { StatusModule } from './api/status/status.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import EnvironmentVariables from './shared/env-variables';
     }),
     RequestModule,
     AuthModule,
+    StatusModule,
   ],
   controllers: [AppController],
   providers: [
