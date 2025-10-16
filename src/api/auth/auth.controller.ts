@@ -16,7 +16,6 @@ import { Profile } from 'passport-google-oauth20';
 import EnvironmentVariables from 'src/shared/env-variables';
 import { Public } from 'src/shared/decorators/public.decorator';
 
-@Public()
 @Controller('auth')
 export class AuthController {
   constructor(
@@ -24,11 +23,13 @@ export class AuthController {
     private readonly authService: AuthService,
   ) {}
 
+  @Public()
   @Get('google')
   @UseGuards(SessionAuthGuard)
   async googleAuth() {}
 
   @Get('google/redirect')
+  @Public()
   @UseGuards(AuthGuard('google'))
   async googleRedirect(
     @Req() req: Request,

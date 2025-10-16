@@ -1,13 +1,31 @@
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { ConfigModule } from '@nestjs/config';
 import { UserModule } from './api/user/user.module';
+import { APP_GUARD } from '@nestjs/core';
+import { AuthGuard } from './api/auth/guards/auth.guard';
+import { JwtModule } from '@nestjs/jwt';
+import { RequestModule } from './request/request.module';
 import { AuthModule } from './api/auth/auth.module';
+import EnvironmentVariables from './shared/env-variables';
 
 @Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true }), AuthModule, UserModule],
+  imports: [
+    UserModule,
+    JwtModule.register({
+      secret: EnvironmentVariables.jwtSecret,
+      signOptions: { expiresIn: '24h' },
+    }),
+    RequestModule,
+    AuthModule,
+  ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_GUARD,
+      useClass: AuthGuard,
+    },
+  ],
 })
 export class AppModule {}
