@@ -6,6 +6,10 @@ import EnvironmentVariables from 'src/shared/env-variables';
 export class UploadService {
   private readonly client = new S3Client({
     region: EnvironmentVariables.s3Region,
+    credentials: {
+      accessKeyId: EnvironmentVariables.s3AccessKey,
+      secretAccessKey: EnvironmentVariables.s3SecretKey,
+    },
   });
 
   constructor() {}
