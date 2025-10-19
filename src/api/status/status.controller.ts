@@ -48,6 +48,6 @@ export class StatusController {
 
   @Delete(':id')
   remove(@Param('id') id: string) {
-    return this.statusService.remove(+id);
+    return this.statusService.delete(+id);
   }
 }
