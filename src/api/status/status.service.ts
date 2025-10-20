@@ -127,8 +127,32 @@ export class StatusService {
     return `This action returns all status`;
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} status`;
+  async findOne(id: number) {
+    const status: Status | null = await this.prismaService.status.findUnique({
+      where: { id: id },
+    });
+
+    if (!status) {
+      throw new NotFoundException('Status not found');
+    }
+
+    // The status that the current status MIGHT be replying to
+    const parentStatus: Status | null = status.parentId
+      ? await this.prismaService.status.findUnique({
+          where: { id: status.parentId },
+        })
+      : null;
+
+    // Replies
+    const childrenStatuses: Status[] = await this.prismaService.status.findMany(
+      { where: { parentId: id } },
+    );
+
+    return {
+      status,
+      parentStatus,
+      childrenStatuses,
+    };
   }
 
   update(id: number, updateStatusDto: UpdateStatusDto) {
