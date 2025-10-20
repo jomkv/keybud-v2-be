@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreateStatusDto } from './dto/create-status.dto';
 import { UpdateStatusDto } from './dto/update-status.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -6,7 +10,7 @@ import { extname } from 'path';
 import { createHash } from 'crypto';
 import { UploadService } from 'src/upload/upload.service';
 import { PrismaClientKnownRequestError } from 'generated/prisma/runtime/library';
-import { Attachment } from 'generated/prisma';
+import { Attachment, Status } from 'generated/prisma';
 
 @Injectable()
 export class StatusService {
@@ -132,29 +136,40 @@ export class StatusService {
   }
 
   async delete(id: number) {
-    return this.prismaService.$transaction(async (tx) => {
-      const attachments: Attachment[] = await tx.attachment.findMany({
-        where: { statusId: id },
+    try {
+      return await this.prismaService.$transaction(async (tx) => {
+        const attachments: Attachment[] = await tx.attachment.findMany({
+          where: { statusId: id },
+        });
+
+        // Extract s3 object keys
+        const keys: string[] = attachments.map((attachment) => attachment.key);
+
+        // Delete attachments from db
+        await tx.attachment.deleteMany({
+          where: { statusId: id },
+        });
+
+        // Delete s3 objects
+        await this.uploadService.deleteMany(keys);
+
+        // Delete status from db
+        await tx.status.delete({ where: { id: id } });
+
+        return {
+          deletedStatus: id,
+          deletedAttachmentsCount: keys.length,
+        };
       });
+    } catch (error) {
+      if (
+        error instanceof PrismaClientKnownRequestError &&
+        error.code === 'P2025' // Record not found
+      ) {
+        throw new NotFoundException(`Status with ID ${id} not found`);
+      }
 
-      // Extract s3 object keys
-      const keys: string[] = attachments.map((attachment) => attachment.key);
-
-      // Delete attachments from db
-      await tx.attachment.deleteMany({
-        where: { statusId: id },
-      });
-
-      // Delete s3 objects
-      await this.uploadService.deleteMany(keys);
-
-      // Delete status from db
-      await tx.status.delete({ where: { id: id } });
-
-      return {
-        deletedStatus: id,
-        deletedAttachmentsCount: keys.length,
-      };
-    });
+      throw error;
+    }
   }
 }
