@@ -22,12 +22,14 @@ model User {
   switchType SwitchType?
 
   // Relations
-  setting    UserSetting?
-  followers  UserFollow[]   @relation("UserFollows")
-  followings UserFollow[]   @relation("UserFollowing")
-  statuses   Status[]
-  stars      StatusStar[]
-  reposts    StatusRepost[]
+  setting          UserSetting?
+  followers        UserFollow[]   @relation("UserFollows")
+  followings       UserFollow[]   @relation("UserFollowing")
+  statuses         Status[]
+  stars            StatusStar[]
+  reposts          StatusRepost[]
+  sentMessages     Message[]      @relation("SentMessages")
+  receivedMessages Message[]      @relation("ReceivedMessages")
 }
 
 model UserSetting {
@@ -106,4 +108,17 @@ enum SwitchType {
   CLICKY
   TACTILE
   LINEAR
+}
+
+model Message {
+  id         Int       @id @default(autoincrement())
+  senderId   Int
+  receiverId Int
+  content    String // Encrypted
+  createdAt  DateTime  @default(now())
+  readAt     DateTime?
+
+  // Relations
+  sender   User @relation("SentMessages", fields: [senderId], references: [id])
+  receiver User @relation("ReceivedMessages", fields: [receiverId], references: [id])
 }
