@@ -61,13 +61,14 @@ export class StatusService {
   async create(
     createStatusDto: CreateStatusDto,
     attachments: Express.Multer.File[],
+    userId: number,
   ) {
     try {
       return await this.prismaService.$transaction(async (tx) => {
         // Create status
         const status = await tx.status.create({
           data: {
-            userId: +createStatusDto.userId,
+            userId: userId,
             parentId: createStatusDto.parentId
               ? +createStatusDto.parentId
               : null,

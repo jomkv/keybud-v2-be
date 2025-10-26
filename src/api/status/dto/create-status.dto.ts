@@ -6,13 +6,9 @@ import {
 } from 'class-validator';
 
 export class CreateStatusDto {
-  @IsNotEmpty()
-  @IsNumberString()
-  userId: number;
-
   @IsOptional()
   @IsNumberString()
-  parentId?: number;
+  parentId?: string;
 
   @IsOptional()
   @IsString()

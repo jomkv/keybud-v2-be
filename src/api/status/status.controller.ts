@@ -16,10 +16,14 @@ import { CreateStatusDto } from './dto/create-status.dto';
 import { UpdateStatusDto } from './dto/update-status.dto';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { AttachmentValidationPipe } from './pipes/attachment-validation.pipe';
+import { RequestService } from 'src/request/request.service';
 
 @Controller('status')
 export class StatusController {
-  constructor(private readonly statusService: StatusService) {}
+  constructor(
+    private readonly statusService: StatusService,
+    private readonly requestService: RequestService,
+  ) {}
 
   @Post()
   @UseInterceptors(FilesInterceptor('attachments', 4))
@@ -28,7 +32,9 @@ export class StatusController {
     @UploadedFiles(new AttachmentValidationPipe())
     attachments: Express.Multer.File[],
   ) {
-    return this.statusService.create(createStatusDto, attachments);
+    const user = this.requestService.getUser();
+
+    return this.statusService.create(createStatusDto, attachments, user.id);
   }
 
   @Get()
