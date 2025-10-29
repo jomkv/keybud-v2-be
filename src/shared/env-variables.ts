@@ -13,6 +13,10 @@ class EnvironmentVariables {
     return process.env.JWT_SECRET;
   }
 
+  get encryptionSecret(): string {
+    return process.env.ENCRYPTION_SECRET;
+  }
+
   get clientId(): string {
     return process.env.GOOGLE_CLIENT_ID;
   }

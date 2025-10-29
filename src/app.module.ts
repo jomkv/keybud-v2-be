@@ -9,6 +9,8 @@ import { RequestModule } from './request/request.module';
 import { AuthModule } from './api/auth/auth.module';
 import EnvironmentVariables from './shared/env-variables';
 import { StatusModule } from './api/status/status.module';
+import { MessageModule } from './api/message/message.module';
+import { ConversationModule } from './api/conversation/conversation.module';
 
 @Module({
   imports: [
@@ -20,6 +22,8 @@ import { StatusModule } from './api/status/status.module';
     RequestModule,
     AuthModule,
     StatusModule,
+    MessageModule,
+    ConversationModule,
   ],
   controllers: [AppController],
   providers: [

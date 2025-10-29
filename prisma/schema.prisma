@@ -22,14 +22,14 @@ model User {
   switchType SwitchType?
 
   // Relations
-  setting          UserSetting?
-  followers        UserFollow[]   @relation("UserFollows")
-  followings       UserFollow[]   @relation("UserFollowing")
-  statuses         Status[]
-  stars            StatusStar[]
-  reposts          StatusRepost[]
-  sentMessages     Message[]      @relation("SentMessages")
-  receivedMessages Message[]      @relation("ReceivedMessages")
+  setting                  UserSetting?
+  followers                UserFollow[]         @relation("UserFollows")
+  followings               UserFollow[]         @relation("UserFollowing")
+  statuses                 Status[]
+  stars                    StatusStar[]
+  reposts                  StatusRepost[]
+  sentMessages             Message[]            @relation("SentMessages")
+  conversationParticipants ConversationMember[]
 }
 
 model UserSetting {
@@ -111,14 +111,45 @@ enum SwitchType {
 }
 
 model Message {
-  id         Int       @id @default(autoincrement())
-  senderId   Int
-  receiverId Int
-  content    String // Encrypted
-  createdAt  DateTime  @default(now())
-  readAt     DateTime?
+  id             Int       @id @default(autoincrement())
+  senderId       Int
+  conversationId Int
+  content        String // Encrypted
+  createdAt      DateTime  @default(now())
+  readAt         DateTime?
 
   // Relations
-  sender   User @relation("SentMessages", fields: [senderId], references: [id])
-  receiver User @relation("ReceivedMessages", fields: [receiverId], references: [id])
+  sender       User         @relation("SentMessages", fields: [senderId], references: [id])
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+}
+
+model Conversation {
+  id        Int              @id @default(autoincrement())
+  type      ConversationType @default(DIRECT)
+  name      String? // For groupchat names
+  createdAt DateTime         @default(now())
+
+  // Relations
+  members  ConversationMember[]
+  messages Message[]
+}
+
+// Many-to-Many 
+model ConversationMember {
+  id             Int      @id @default(autoincrement())
+  conversationId Int
+  userId         Int
+  joinedAt       DateTime @default(now())
+  isAdmin        Boolean  @default(false)
+
+  // Relations
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+  user         User         @relation(fields: [userId], references: [id])
+
+  @@unique([conversationId, userId])
+}
+
+enum ConversationType {
+  DIRECT
+  GROUP
 }
