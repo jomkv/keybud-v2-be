@@ -21,15 +21,6 @@ export class ConversationService {
     createConversationDto: CreateConversationDto,
     userId: number,
   ): Promise<Conversation> {
-    const { memberIds } = createConversationDto;
-
-    // If user is not part of members
-    if (!memberIds.includes(userId)) {
-      throw new UnauthorizedException(
-        "User not allowed to create conversation on other user's behalf",
-      );
-    }
-
     try {
       return await this.prismaService.$transaction(async (tx) => {
         // Create conversation
@@ -38,8 +29,8 @@ export class ConversationService {
         });
 
         // Create conversation members
-        const members = await tx.conversationMember.createMany({
-          data: memberIds.map((memberId) => ({
+        await tx.conversationMember.createMany({
+          data: createConversationDto.memberIds.map((memberId) => ({
             conversationId: conversation.id,
             userId: memberId,
           })),
@@ -97,13 +88,5 @@ export class ConversationService {
 
   findOne(id: number) {
     return `This action returns a #${id} conversation`;
-  }
-
-  update(id: number, updateConversationDto: UpdateConversationDto) {
-    return `This action updates a #${id} conversation`;
-  }
-
-  remove(id: number) {
-    return `This action removes a #${id} conversation`;
   }
 }

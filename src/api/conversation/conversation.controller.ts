@@ -7,6 +7,7 @@ import {
   Param,
   Delete,
   ValidationPipe,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { ConversationService } from './conversation.service';
 import { CreateConversationDto } from './dto/create-conversation.dto';
@@ -24,6 +25,13 @@ export class ConversationController {
   create(@Body(ValidationPipe) createConversationDto: CreateConversationDto) {
     const user = this.requestService.getUser();
 
+    // If user is not part of members
+    if (!createConversationDto.memberIds.includes(user.id)) {
+      throw new UnauthorizedException(
+        "User not allowed to create conversation on other user's behalf",
+      );
+    }
+
     return this.conversationService.create(createConversationDto, user.id);
   }
 
@@ -37,18 +45,5 @@ export class ConversationController {
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.conversationService.findOne(+id);
-  }
-
-  @Patch(':id')
-  update(
-    @Param('id') id: string,
-    @Body() updateConversationDto: UpdateConversationDto,
-  ) {
-    return this.conversationService.update(+id, updateConversationDto);
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.conversationService.remove(+id);
   }
 }
