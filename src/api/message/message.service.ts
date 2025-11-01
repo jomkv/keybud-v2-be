@@ -45,7 +45,7 @@ export class MessageService {
    * @param {string} content - Message's content to be decrypted
    * @returns {string} Decrypted content of the message
    */
-  private decryptContent(content: string): string {
+  public decryptContent(content: string): string {
     const parts = content.split(':');
 
     if (parts.length !== 2) {

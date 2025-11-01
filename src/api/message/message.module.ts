@@ -8,5 +8,6 @@ import { RequestModule } from 'src/request/request.module';
   imports: [PrismaModule, RequestModule],
   controllers: [MessageController],
   providers: [MessageService],
+  exports: [MessageService],
 })
 export class MessageModule {}

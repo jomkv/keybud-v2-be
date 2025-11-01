@@ -29,7 +29,9 @@ export class ConversationController {
 
   @Get()
   findAll() {
-    return this.conversationService.findAll();
+    const user = this.requestService.getUser();
+
+    return this.conversationService.findAll(user.id);
   }
 
   @Get(':id')

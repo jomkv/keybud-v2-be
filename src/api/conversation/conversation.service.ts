@@ -8,10 +8,14 @@ import { UpdateConversationDto } from './dto/update-conversation.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { Conversation } from 'generated/prisma';
 import { PrismaClientKnownRequestError } from 'generated/prisma/runtime/library';
+import { MessageService } from '../message/message.service';
 
 @Injectable()
 export class ConversationService {
-  constructor(private readonly prismaService: PrismaService) {}
+  constructor(
+    private readonly prismaService: PrismaService,
+    private readonly messageService: MessageService,
+  ) {}
 
   async create(
     createConversationDto: CreateConversationDto,
@@ -56,8 +60,39 @@ export class ConversationService {
     }
   }
 
-  findAll() {
-    return `This action returns all conversation`;
+  async findAll(userId: number) {
+    const conversations = await this.prismaService.conversation.findMany({
+      where: { members: { some: { userId } } },
+      include: {
+        members: {
+          include: {
+            user: {
+              select: {
+                username: true,
+              },
+            },
+          },
+        },
+        messages: {
+          take: 1, // get latest
+          orderBy: {
+            createdAt: 'desc', // latest first
+          },
+        },
+      },
+    });
+
+    const decryptedConversations = conversations.map((convo) => {
+      if (convo.messages.length > 0 && convo.messages[0]?.content) {
+        convo.messages[0].content = this.messageService.decryptContent(
+          convo.messages[0].content,
+        );
+      }
+
+      return convo;
+    });
+
+    return decryptedConversations;
   }
 
   findOne(id: number) {

@@ -3,9 +3,10 @@ import { ConversationService } from './conversation.service';
 import { ConversationController } from './conversation.controller';
 import { PrismaModule } from 'src/prisma/prisma.module';
 import { RequestModule } from 'src/request/request.module';
+import { MessageModule } from '../message/message.module';
 
 @Module({
-  imports: [PrismaModule, RequestModule],
+  imports: [PrismaModule, RequestModule, MessageModule],
   controllers: [ConversationController],
   providers: [ConversationService],
 })
