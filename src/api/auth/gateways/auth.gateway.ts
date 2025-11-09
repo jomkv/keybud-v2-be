@@ -8,6 +8,7 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { RedisService } from 'src/redis/redis.service';
+import { AuthSessionKey, AuthSocketKey } from 'src/shared/types/redis';
 
 export const AUTH_MESSAGES = {
   REGISTER: 'auth:subscribe', // client subscribes to our io
@@ -16,8 +17,8 @@ export const AUTH_MESSAGES = {
 };
 
 export const REDIS_KEYS = {
-  SOCKET: (socketId: string) => `ws:socket:${socketId}`,
-  SESSION: (sessionId: string) => `ws:session:${sessionId}`,
+  SOCKET: (socketId: string): AuthSocketKey => `auth:socket:${socketId}`,
+  SESSION: (sessionId: string): AuthSessionKey => `auth:session:${sessionId}`,
 };
 
 @WebSocketGateway({

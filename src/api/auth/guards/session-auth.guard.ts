@@ -3,7 +3,7 @@ import { Request } from 'express';
 import { RequestService } from 'src/request/request.service';
 import { RedisService } from 'src/redis/redis.service';
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
-import { SessionNonceKey } from 'src/shared/types/auth';
+import { AuthNonceKey } from 'src/shared/types/redis';
 
 /**
  * Session-based authentication guard that extends Google OAuth2 authentication.
@@ -39,7 +39,7 @@ export class SessionAuthGuard
     const sessionId = request.query.session as string;
 
     const nonce = crypto.randomUUID();
-    const nonceKey: SessionNonceKey = `nonce:${nonce}`;
+    const nonceKey: AuthNonceKey = `auth:nonce:${nonce}`;
 
     await this.redisService.set(nonceKey, sessionId);
 
