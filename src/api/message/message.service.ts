@@ -2,8 +2,6 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import {
-  createCipher,
-  createDecipher,
   randomBytes,
   createHash,
   createCipheriv,
@@ -12,17 +10,27 @@ import {
 import EnvironmentVariables from 'src/shared/env-variables';
 import { PrismaClientKnownRequestError } from 'generated/prisma/runtime/library';
 import { Message } from 'generated/prisma';
+import { RedisService } from 'src/redis/redis.service';
+import { MessageCursorKey } from 'src/shared/types/redis';
 
 @Injectable()
 export class MessageService {
-  constructor(private readonly prismaService: PrismaService) {}
+  constructor(
+    private readonly prismaService: PrismaService,
+    private readonly redisService: RedisService,
+  ) {}
 
-  private readonly algorithm = 'aes-256-ctr';
-  private readonly secretKey = this.generateKey(
+  private readonly PAGINATION_LIMIT = 15;
+  private readonly ALGORITHM = 'aes-256-ctr';
+  private readonly SECRET_KEY = this.generateKey(
     EnvironmentVariables.encryptionSecret,
   );
+
   /**
    * Generate a consistent 32-byte key from secret
+   *
+   * @param {string} secret - The secret string to generate encryption key from
+   * @returns {Buffer} SHA-256 hash of the secret as a Buffer for encryption use
    */
   private generateKey(secret: string): Buffer {
     return createHash('sha256').update(secret).digest();
@@ -34,7 +42,7 @@ export class MessageService {
    */
   private encryptContent(content: string): string {
     const iv = randomBytes(16);
-    const cipher = createCipheriv(this.algorithm, this.secretKey, iv);
+    const cipher = createCipheriv(this.ALGORITHM, this.SECRET_KEY, iv);
 
     const encrypted = Buffer.concat([cipher.update(content), cipher.final()]);
 
@@ -56,7 +64,7 @@ export class MessageService {
     const iv = Buffer.from(parts[0], 'hex');
     const encrypted = Buffer.from(parts[1], 'hex');
 
-    const decipher = createDecipheriv(this.algorithm, this.secretKey, iv);
+    const decipher = createDecipheriv(this.ALGORITHM, this.SECRET_KEY, iv);
 
     const decrypted = Buffer.concat([
       decipher.update(encrypted),
@@ -66,6 +74,138 @@ export class MessageService {
     return decrypted.toString('utf-8');
   }
 
+  /**
+   * Retrieves the existing pagination cursor for a specific user and conversation from Redis
+   *
+   * @param {number} conversationId - The ID of the conversation
+   * @param {number} userId - The ID of the user requesting messages
+   * @returns {Promise<number | null>} The cursor ID if exists, null if no cursor found
+   */
+  private async getExistingCursor(
+    conversationId: number,
+    userId: number,
+  ): Promise<number | null> {
+    const existingCursorKey: MessageCursorKey = `message:cursor:${userId}-${conversationId}`;
+    const existingCursor: string | null =
+      await this.redisService.get(existingCursorKey);
+
+    return existingCursor ? +existingCursor : null;
+  }
+
+  /**
+   * Saves the pagination cursor for a specific user and conversation to Redis
+   *
+   * @param {number} conversationId - The ID of the conversation
+   * @param {number} userId - The ID of the user
+   * @param {number} cursor - The message ID to use as cursor for next pagination
+   * @returns {Promise<void>}
+   */
+  private async saveCursor(
+    conversationId: number,
+    userId: number,
+    cursor: number,
+  ): Promise<void> {
+    // TODO: Add cursorKey cleanup after client leaves page (use websocket)
+    const cursorKey: MessageCursorKey = `message:cursor:${userId}-${conversationId}`;
+    await this.redisService.set(cursorKey, String(cursor));
+  }
+
+  /**
+   * Deletes the pagination cursor for a specific user and conversation from Redis
+   * Used to reset pagination to start from the beginning
+   *
+   * @param {number} conversationId - The ID of the conversation
+   * @param {number} userId - The ID of the user
+   * @returns {Promise<void>}
+   */
+  private async deleteCursor(
+    conversationId: number,
+    userId: number,
+  ): Promise<void> {
+    const cursorKey: MessageCursorKey = `message:cursor:${userId}-${conversationId}`;
+    await this.redisService.delete(cursorKey);
+  }
+
+  /**
+   * Retrieves paginated messages from a conversation with automatic decryption
+   * Supports cursor-based pagination and reset functionality for infinite scroll
+   *
+   * @param {number} conversationId - The ID of the conversation to fetch messages from
+   * @param {number} userId - The ID of the user requesting messages (for cursor tracking)
+   * @param {boolean} reset - Whether to reset pagination and start from latest messages
+   * @returns {Promise<Message[]>} Array of decrypted messages in descending order (latest first)
+   *
+   * @example
+   * // Initial load (reset pagination)
+   * const latestMessages = await findMessagesFromConversation(123, 456, true);
+   *
+   * // Load more messages (continue pagination)
+   * const olderMessages = await findMessagesFromConversation(123, 456, false);
+   */
+  public async findMessagesFromConversation(
+    conversationId: number,
+    userId: number,
+    reset: boolean,
+  ): Promise<Message[]> {
+    if (reset) {
+      await this.deleteCursor(conversationId, userId);
+    }
+
+    const existingCursor: number | null = reset
+      ? null
+      : await this.getExistingCursor(conversationId, userId);
+
+    let messages: Message[] = [];
+
+    if (existingCursor) {
+      messages = await this.prismaService.message.findMany({
+        take: this.PAGINATION_LIMIT,
+        skip: 1, // Skip the cursor itself
+        cursor: {
+          id: +existingCursor,
+        },
+        where: { conversationId: conversationId },
+        orderBy: {
+          createdAt: 'desc', // Latest messages first
+        },
+      });
+    } else {
+      messages = await this.prismaService.message.findMany({
+        take: this.PAGINATION_LIMIT,
+        where: { conversationId: conversationId },
+        orderBy: {
+          createdAt: 'desc', // Latest messages first
+        },
+      });
+    }
+
+    const paginationCursor: number | null =
+      messages.length > 0 ? messages[messages.length - 1].id : null; // Get id from last query result if possible
+
+    if (paginationCursor) {
+      await this.saveCursor(conversationId, userId, paginationCursor);
+    }
+
+    const decryptedMessages: Message[] = messages.map((message) => ({
+      ...message,
+      content: this.decryptContent(message.content),
+    }));
+
+    return decryptedMessages;
+  }
+
+  /**
+   * Creates a new message in a conversation with automatic content encryption
+   *
+   * @param {CreateMessageDto} createMessageDto - DTO containing message content and conversation ID
+   * @param {number} senderId - The ID of the user sending the message
+   * @returns {Promise<Message>} The created message with encrypted content stored in database
+   * @throws {BadRequestException} When conversation is not found (foreign key error)
+   *
+   * @example
+   * const messageDto = { content: "Hello world!", conversationId: "123" };
+   * const newMessage = await create(messageDto, 456);
+   */
   async create(createMessageDto: CreateMessageDto, senderId: number) {
     const encryptedContent = this.encryptContent(createMessageDto.content);
 

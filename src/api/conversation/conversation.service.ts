@@ -1,10 +1,5 @@
-import {
-  BadRequestException,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { CreateConversationDto } from './dto/create-conversation.dto';
-import { UpdateConversationDto } from './dto/update-conversation.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { Conversation } from 'generated/prisma';
 import { PrismaClientKnownRequestError } from 'generated/prisma/runtime/library';
@@ -60,6 +55,7 @@ export class ConversationService {
             user: {
               select: {
                 username: true,
+                email: true,
               },
             },
           },
@@ -86,7 +82,21 @@ export class ConversationService {
     return decryptedConversations;
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} conversation`;
+  findOne(conversationId: number, userId: number) {
+    return this.prismaService.conversation.findUnique({
+      where: { id: conversationId, members: { some: { userId } } },
+      include: {
+        members: {
+          include: {
+            user: {
+              select: {
+                username: true,
+                email: true,
+              },
+            },
+          },
+        },
+      },
+    });
   }
 }

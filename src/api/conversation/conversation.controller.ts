@@ -3,22 +3,23 @@ import {
   Get,
   Post,
   Body,
-  Patch,
   Param,
-  Delete,
   ValidationPipe,
   UnauthorizedException,
+  NotFoundException,
+  Query,
 } from '@nestjs/common';
 import { ConversationService } from './conversation.service';
 import { CreateConversationDto } from './dto/create-conversation.dto';
-import { UpdateConversationDto } from './dto/update-conversation.dto';
 import { RequestService } from 'src/request/request.service';
+import { MessageService } from '../message/message.service';
 
 @Controller('conversation')
 export class ConversationController {
   constructor(
     private readonly conversationService: ConversationService,
     private readonly requestService: RequestService,
+    private readonly messageService: MessageService,
   ) {}
 
   @Post()
@@ -43,7 +44,21 @@ export class ConversationController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.conversationService.findOne(+id);
+  async findOne(@Param('id') id: string, @Query('reset') reset?: string) {
+    const user = this.requestService.getUser();
+
+    const conversation = await this.conversationService.findOne(+id, user.id);
+
+    if (!conversation) {
+      throw new NotFoundException('Conversation not found');
+    }
+
+    const messages = await this.messageService.findMessagesFromConversation(
+      +id,
+      user.id,
+      reset === 'true',
+    );
+
+    return { conversation, messages };
   }
 }
