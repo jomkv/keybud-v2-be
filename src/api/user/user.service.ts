@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { User } from 'generated/prisma';
+import { User, UserFollow } from 'generated/prisma';
 import { AuthInput } from 'src/shared/types/auth';
 
 @Injectable()
@@ -63,5 +63,36 @@ export class UserService {
 
   remove(id: number) {
     return `This action removes a #${id} user`;
+  }
+
+  async follow(userId: number, recipientUserId: number) {
+    const existingFollow: UserFollow | null =
+      await this.prismaService.userFollow.findFirst({
+        where: {
+          followerUserId: userId,
+          followingUserId: recipientUserId,
+        },
+      });
+
+    if (existingFollow) {
+      // Unfollow
+      await this.prismaService.userFollow.delete({
+        where: {
+          id: existingFollow.id,
+        },
+      });
+    } else {
+      // Follow
+      await this.prismaService.userFollow.create({
+        data: {
+          followerUserId: userId,
+          followingUserId: recipientUserId,
+        },
+      });
+    }
+
+    return {
+      message: `User #${recipientUserId} ${existingFollow ? 'Unfollowed' : 'Followed'}`,
+    };
   }
 }

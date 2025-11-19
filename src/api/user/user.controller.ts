@@ -6,14 +6,20 @@ import {
   Patch,
   Param,
   Delete,
+  ParseIntPipe,
+  BadRequestException,
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { RequestService } from 'src/request/request.service';
 
 @Controller('user')
 export class UserController {
-  constructor(private readonly userService: UserService) {}
+  constructor(
+    private readonly userService: UserService,
+    private readonly requestService: RequestService,
+  ) {}
 
   @Post()
   create(@Body() createUserDto: CreateUserDto) {
@@ -38,5 +44,16 @@ export class UserController {
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.userService.remove(+id);
+  }
+
+  @Post('follow/:id')
+  follow(@Param('id', ParseIntPipe) id: number) {
+    const user = this.requestService.getUser();
+
+    if (user.id === id) {
+      throw new BadRequestException('You cannot follow/unfollow yourself');
+    }
+
+    return this.userService.follow(user.id, id);
   }
 }
