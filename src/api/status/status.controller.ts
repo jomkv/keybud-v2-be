@@ -10,6 +10,7 @@ import {
   UploadedFile,
   ValidationPipe,
   UploadedFiles,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { StatusService } from './status.service';
 import { CreateStatusDto } from './dto/create-status.dto';
@@ -43,17 +44,20 @@ export class StatusController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.statusService.findOne(+id);
+  findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.statusService.findOne(id);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateStatusDto: UpdateStatusDto) {
-    return this.statusService.update(+id, updateStatusDto);
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateStatusDto: UpdateStatusDto,
+  ) {
+    return this.statusService.update(id, updateStatusDto);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.statusService.delete(+id);
+  remove(@Param('id', ParseIntPipe) id: number) {
+    return this.statusService.delete(id);
   }
 }

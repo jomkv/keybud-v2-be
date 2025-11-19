@@ -8,6 +8,7 @@ import {
   UnauthorizedException,
   NotFoundException,
   Query,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { ConversationService } from './conversation.service';
 import { CreateConversationDto } from './dto/create-conversation.dto';
@@ -44,17 +45,20 @@ export class ConversationController {
   }
 
   @Get(':id')
-  async findOne(@Param('id') id: string, @Query('reset') reset?: string) {
+  async findOne(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('reset') reset?: string,
+  ) {
     const user = this.requestService.getUser();
 
-    const conversation = await this.conversationService.findOne(+id, user.id);
+    const conversation = await this.conversationService.findOne(id, user.id);
 
     if (!conversation) {
       throw new NotFoundException('Conversation not found');
     }
 
     const messages = await this.messageService.findMessagesFromConversation(
-      +id,
+      id,
       user.id,
       reset === 'true',
     );
