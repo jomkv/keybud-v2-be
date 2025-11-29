@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { CreateStatusDto } from './dto/create-status.dto';
 import { UpdateStatusDto } from './dto/update-status.dto';
@@ -124,8 +125,39 @@ export class StatusService {
     }
   }
 
-  findAll() {
-    return `This action returns all status`;
+  async findAll() {
+    return await this.prismaService.status.findMany({
+      where: {
+        parentId: null, // Only top-level statuses
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            email: true,
+            switchType: true,
+          },
+        },
+        attachments: {
+          select: {
+            id: true,
+            key: true,
+            createdAt: true,
+          },
+        },
+        _count: {
+          select: {
+            stars: true, // Star count
+            reposts: true, // Repost count
+            comments: true, // Comment count (replies)
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc', // Latest first
+      },
+    });
   }
 
   async findOne(id: number) {
@@ -156,45 +188,159 @@ export class StatusService {
     };
   }
 
-  update(id: number, updateStatusDto: UpdateStatusDto) {
-    return `This action updates a #${id} status`;
+  update(statusId: number, updateStatusDto: UpdateStatusDto, userId: number) {
+    // TODO
+    return `This action updates a #${statusId} status`;
   }
 
-  async delete(id: number) {
+  async delete(statusId: number, userId: number) {
+    const statusToDelete = await this.prismaService.status.findUnique({
+      where: {
+        id: statusId,
+      },
+    });
+
+    if (!statusToDelete) {
+      throw new NotFoundException(`Status with ID ${statusId} not found`);
+    }
+
+    if (statusToDelete.userId !== userId) {
+      throw new UnauthorizedException(
+        'User is not authorized to perform this action',
+      );
+    }
+
+    return await this.prismaService.$transaction(async (tx) => {
+      const attachments: Attachment[] = await tx.attachment.findMany({
+        where: { statusId: statusToDelete.id },
+      });
+
+      // Extract s3 object keys
+      const keys: string[] = attachments.map((attachment) => attachment.key);
+
+      // Delete attachments from db
+      await tx.attachment.deleteMany({
+        where: { statusId: statusToDelete.id },
+      });
+
+      // Delete s3 objects
+      await this.uploadService.deleteMany(keys);
+
+      // Delete status from db
+      await tx.status.delete({ where: { id: statusToDelete.id } });
+
+      return {
+        deletedStatus: statusToDelete.id,
+        deletedAttachmentsCount: keys.length,
+      };
+    });
+  }
+
+  async star(statusId: number, userId: number) {
+    const existingStar = await this.prismaService.statusStar.findFirst({
+      where: {
+        statusId: statusId,
+        userId: userId,
+      },
+    });
+
+    if (existingStar) {
+      throw new BadRequestException(
+        `Status with ID ${statusId} is already starred`,
+      );
+    }
+
     try {
-      return await this.prismaService.$transaction(async (tx) => {
-        const attachments: Attachment[] = await tx.attachment.findMany({
-          where: { statusId: id },
-        });
-
-        // Extract s3 object keys
-        const keys: string[] = attachments.map((attachment) => attachment.key);
-
-        // Delete attachments from db
-        await tx.attachment.deleteMany({
-          where: { statusId: id },
-        });
-
-        // Delete s3 objects
-        await this.uploadService.deleteMany(keys);
-
-        // Delete status from db
-        await tx.status.delete({ where: { id: id } });
-
-        return {
-          deletedStatus: id,
-          deletedAttachmentsCount: keys.length,
-        };
+      return await this.prismaService.statusStar.create({
+        data: {
+          userId: userId,
+          statusId: statusId,
+        },
       });
     } catch (error) {
       if (
         error instanceof PrismaClientKnownRequestError &&
         error.code === 'P2025' // Record not found
       ) {
-        throw new NotFoundException(`Status with ID ${id} not found`);
+        throw new NotFoundException(`Status with ID ${statusId} not found`);
       }
 
       throw error;
     }
+  }
+
+  async unstar(statusId: number, userId: number) {
+    const existingStar = await this.prismaService.statusStar.findFirst({
+      where: {
+        statusId: statusId,
+        userId: userId,
+      },
+    });
+
+    if (!existingStar) {
+      throw new BadRequestException(
+        `Status with ID ${statusId} is not starred`,
+      );
+    }
+
+    return await this.prismaService.statusStar.delete({
+      where: {
+        id: existingStar.id,
+      },
+    });
+  }
+
+  async repost(statusId: number, userId: number) {
+    const existingRepost = await this.prismaService.statusRepost.findFirst({
+      where: {
+        statusId: statusId,
+        userId: userId,
+      },
+    });
+
+    if (existingRepost) {
+      throw new BadRequestException(
+        `Status with ID ${statusId} is already reposted`,
+      );
+    }
+
+    try {
+      return await this.prismaService.statusRepost.create({
+        data: {
+          userId: userId,
+          statusId: statusId,
+        },
+      });
+    } catch (error) {
+      if (
+        error instanceof PrismaClientKnownRequestError &&
+        error.code === 'P2025' // Record not found
+      ) {
+        throw new NotFoundException(`Status with ID ${statusId} not found`);
+      }
+
+      throw error;
+    }
+  }
+
+  async unrepost(statusId: number, userId: number) {
+    const existingRepost = await this.prismaService.statusRepost.findFirst({
+      where: {
+        statusId: statusId,
+        userId: userId,
+      },
+    });
+
+    if (!existingRepost) {
+      throw new BadRequestException(
+        `Status with ID ${statusId} is not reposted`,
+      );
+    }
+
+    return await this.prismaService.statusRepost.delete({
+      where: {
+        id: existingRepost.id,
+      },
+    });
   }
 }

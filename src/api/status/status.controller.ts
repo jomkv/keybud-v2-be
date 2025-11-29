@@ -53,11 +53,43 @@ export class StatusController {
     @Param('id', ParseIntPipe) id: number,
     @Body() updateStatusDto: UpdateStatusDto,
   ) {
-    return this.statusService.update(id, updateStatusDto);
+    const user = this.requestService.getUser();
+
+    return this.statusService.update(id, updateStatusDto, user.id);
   }
 
   @Delete(':id')
   remove(@Param('id', ParseIntPipe) id: number) {
-    return this.statusService.delete(id);
+    const user = this.requestService.getUser();
+
+    return this.statusService.delete(id, user.id);
+  }
+
+  @Post(':id/star')
+  star(@Param('id', ParseIntPipe) id: number) {
+    const user = this.requestService.getUser();
+
+    return this.statusService.star(id, user.id);
+  }
+
+  @Delete(':id/star')
+  unstar(@Param('id', ParseIntPipe) id: number) {
+    const user = this.requestService.getUser();
+
+    return this.statusService.unstar(id, user.id);
+  }
+
+  @Post(':id/repost')
+  repost(@Param('id', ParseIntPipe) id: number) {
+    const user = this.requestService.getUser();
+
+    return this.statusService.repost(id, user.id);
+  }
+
+  @Delete(':id/repost')
+  unrepost(@Param('id', ParseIntPipe) id: number) {
+    const user = this.requestService.getUser();
+
+    return this.statusService.unrepost(id, user.id);
   }
 }
