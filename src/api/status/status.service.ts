@@ -226,6 +226,18 @@ export class StatusService {
       // Delete s3 objects
       await this.uploadService.deleteMany(keys);
 
+      // Delete reposts and stars
+      await tx.statusRepost.deleteMany({
+        where: {
+          statusId: statusToDelete.id,
+        },
+      });
+      await tx.statusStar.deleteMany({
+        where: {
+          statusId: statusToDelete.id,
+        },
+      });
+
       // Delete status from db
       await tx.status.delete({ where: { id: statusToDelete.id } });
 
