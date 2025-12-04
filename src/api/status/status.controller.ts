@@ -40,7 +40,9 @@ export class StatusController {
 
   @Get()
   findAll() {
-    return this.statusService.findAll();
+    const user = this.requestService.getUser();
+
+    return this.statusService.findAll(user.id);
   }
 
   @Get(':id')

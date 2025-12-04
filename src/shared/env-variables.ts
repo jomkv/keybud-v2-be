@@ -56,6 +56,18 @@ class EnvironmentVariables {
   get s3SecretKey(): string {
     return process.env.S3_SECRET_KEY;
   }
+
+  get cloudfrontDomain(): string {
+    return process.env.CLOUDFRONT_DOMAIN;
+  }
+
+  get cloudfrontKeyPairId(): string {
+    return process.env.CLOUDFRONT_KEY_PAIR_ID;
+  }
+
+  get cloudfrontPrivateKey(): string {
+    return process.env.CLOUDFRONT_PRIVATE_KEY;
+  }
 }
 
 export default new EnvironmentVariables();
