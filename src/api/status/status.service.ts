@@ -40,8 +40,8 @@ export class StatusService {
   private generateAttachmentKey(
     statusId: number,
     attachment: Express.Multer.File,
-    timestamp: number,
   ): string {
+    const timestamp = Date.now();
     const fileExtension = this.getFileExtension(attachment.originalname);
     const hash = this.generateShortHash(`${statusId}-${timestamp}`);
 
@@ -201,13 +201,12 @@ export class StatusService {
         }
 
         // Generate unique keys for each attachment
-        const timestamp = Date.now();
         const attachmentWithKeys: {
           key: string;
           attachment: Express.Multer.File;
         }[] = attachments.map((attachment) => ({
           attachment: attachment,
-          key: this.generateAttachmentKey(status.id, attachment, timestamp),
+          key: this.generateAttachmentKey(status.id, attachment),
         }));
 
         // Upload attachments to s3
