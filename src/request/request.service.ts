@@ -10,7 +10,7 @@ export class RequestService {
     this.user = user;
   }
 
-  getUser() {
+  getUser(): User | null {
     return this.user;
   }
 
