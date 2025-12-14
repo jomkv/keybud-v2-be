@@ -4,10 +4,11 @@ import {
   ArgumentMetadata,
   BadRequestException,
 } from '@nestjs/common';
+import { CONSTANTS } from 'src/shared/constants';
 
 @Injectable()
 export class AttachmentValidationPipe implements PipeTransform {
-  private readonly maxFileSize = 10 * 1024 * 1024; // 10MB
+  private readonly maxFileSize = CONSTANTS.MAX_IMAGE_ATTACHMENT_SIZE;
   private readonly allowedImageTypes = [
     'image/jpeg',
     'image/jpg',
@@ -31,7 +32,7 @@ export class AttachmentValidationPipe implements PipeTransform {
 
       if (file.size > this.maxFileSize) {
         throw new BadRequestException(
-          `Attachment "${file.originalname}" exceeds 10mb.`,
+          `Attachment "${file.originalname}" too large.`,
         );
       }
     }
