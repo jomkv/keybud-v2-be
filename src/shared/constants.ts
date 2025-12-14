@@ -1,0 +1,4 @@
+export const CONSTANTS = {
+  MAX_IMAGE_ATTACHMENTS_LENGTH: 4,
+  MAX_IMAGE_ATTACHMENT_SIZE: 10 * 1024 * 1024, // 10MB,
+} as const;
