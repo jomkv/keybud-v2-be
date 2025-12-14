@@ -11,11 +11,17 @@ import { extname } from 'path';
 import { createHash } from 'crypto';
 import { UploadService } from 'src/upload/upload.service';
 import { PrismaClientKnownRequestError } from 'generated/prisma/runtime/library';
-import { Attachment, Status } from 'generated/prisma';
+import { Attachment, Prisma, Status } from 'generated/prisma';
 import { RedisService } from 'src/redis/redis.service';
 import { REDIS_KEYS } from 'src/shared/redis-keys';
 import EnvironmentVariables from 'src/shared/env-variables';
 import { getSignedUrl } from '@aws-sdk/cloudfront-signer';
+import { CONSTANTS } from 'src/shared/constants';
+
+export interface AttachmentWithKey {
+  key: string;
+  attachment: Express.Multer.File;
+}
 
 @Injectable()
 export class StatusService {
@@ -40,12 +46,13 @@ export class StatusService {
   private generateAttachmentKey(
     statusId: number,
     attachment: Express.Multer.File,
+    index: number,
   ): string {
     const timestamp = Date.now();
     const fileExtension = this.getFileExtension(attachment.originalname);
     const hash = this.generateShortHash(`${statusId}-${timestamp}`);
 
-    return `status-attachments/${statusId}/${timestamp}-${hash}.${fileExtension}`;
+    return `status-attachments/${statusId}/${timestamp}-${index}-${hash}.${fileExtension}`;
   }
 
   /**
@@ -62,6 +69,78 @@ export class StatusService {
    */
   private generateShortHash(input: string): string {
     return createHash('sha1').update(input).digest('hex').substring(0, 8);
+  }
+
+  /**
+   * Upload multiple attachments to the S3 bucket THEN DB
+   *
+   * @param {Express.Multer.File[]} attachments - Attachments from Form Data
+   * @param {number} statusId - ID of the status that the attachments belong to
+   * @param {Prisma.TransactionClient} client - (Optional) Transaction client to be used for the DB query
+   * @returns {Promise<Attachment[]>} Newly created attachments from DB
+   */
+  private async uploadMultipleAttachments(
+    attachments: Express.Multer.File[],
+    statusId: number,
+    client: Prisma.TransactionClient = this.prismaService,
+  ): Promise<Attachment[]> {
+    const attachmentWithKeys: AttachmentWithKey[] = attachments.map(
+      (attachment, index) => ({
+        attachment: attachment,
+        key: this.generateAttachmentKey(statusId, attachment, index),
+      }),
+    );
+
+    // Upload attachments to s3
+    await Promise.all(
+      attachmentWithKeys.map((a) =>
+        this.uploadService.upload(a.key, a.attachment.buffer),
+      ),
+    );
+
+    // Upload to DB and return
+    return await client.attachment.createManyAndReturn({
+      data: attachmentWithKeys.map((a) => ({
+        key: a.key,
+        statusId: statusId,
+      })),
+    });
+  }
+
+  /**
+   * Deletes multiple existing attachments from the S3 bucket THEN DB
+   *
+   * @param {Partial<Pick<Attachment, 'key' | 'id'>>[]} attachmentsToDelete - Existing attachments from DB to be deleted
+   * @param {number} statusId - ID of the status that the attachments belong to
+   * @param {Prisma.TransactionClient} client - (Optional) Transaction client to be used for the DB query
+   * @returns {Promise<number>} Count of deleted attachments
+   */
+  private async deleteMultipleAttachments(
+    attachmentsToDelete: Partial<Pick<Attachment, 'key' | 'id'>>[],
+    statusId: number,
+    client: Prisma.TransactionClient = this.prismaService,
+  ): Promise<number> {
+    const keysToDelete: string[] = attachmentsToDelete.map(
+      (attachment) => attachment.key,
+    );
+
+    // Delete s3 objects
+    await this.uploadService.deleteMany(keysToDelete);
+
+    const idsToDelete: number[] = attachmentsToDelete.map(
+      (attachment) => attachment.id,
+    );
+
+    // Delete attachments from db
+    const { count } = await client.attachment.deleteMany({
+      where: {
+        id: {
+          in: idsToDelete,
+        },
+      },
+    });
+
+    return count;
   }
 
   /**
@@ -200,29 +279,12 @@ export class StatusService {
           return { status, attachments: [] };
         }
 
-        // Generate unique keys for each attachment
-        const attachmentWithKeys: {
-          key: string;
-          attachment: Express.Multer.File;
-        }[] = attachments.map((attachment) => ({
-          attachment: attachment,
-          key: this.generateAttachmentKey(status.id, attachment),
-        }));
-
-        // Upload attachments to s3
-        await Promise.all(
-          attachmentWithKeys.map((a) =>
-            this.uploadService.upload(a.key, a.attachment.buffer),
-          ),
-        );
-
         // Save attachments to db
-        const newAttachments = await tx.attachment.createManyAndReturn({
-          data: attachmentWithKeys.map((a) => ({
-            key: a.key,
-            statusId: status.id,
-          })),
-        });
+        const newAttachments = await this.uploadMultipleAttachments(
+          attachments,
+          status.id,
+          tx,
+        );
 
         return {
           status: status,
@@ -324,9 +386,76 @@ export class StatusService {
     };
   }
 
-  update(statusId: number, updateStatusDto: UpdateStatusDto, userId: number) {
-    // TODO
-    return `This action updates a #${statusId} status`;
+  async update(
+    statusToUpdate: Status,
+    updateStatusDto: UpdateStatusDto,
+    newAttachments: Express.Multer.File[],
+  ) {
+    return await this.prismaService.$transaction(async (tx) => {
+      const existingAttachments = await tx.attachment.findMany({
+        where: {
+          statusId: statusToUpdate.id,
+        },
+      });
+
+      const updatedExistingAttachmentsLength =
+        existingAttachments.length -
+        updateStatusDto.removedAttachmentIds.length;
+
+      // Validate if total attachments will exceed 4
+      if (
+        updatedExistingAttachmentsLength + newAttachments.length >
+        CONSTANTS.MAX_IMAGE_ATTACHMENTS_LENGTH
+      ) {
+        throw new BadRequestException(
+          `Maximum of ${CONSTANTS.MAX_IMAGE_ATTACHMENTS_LENGTH} attachments`,
+        );
+      }
+
+      // Update status
+      const updatedStatus = await tx.status.update({
+        where: {
+          id: statusToUpdate.id,
+        },
+        data: {
+          title: updateStatusDto.title,
+          description: updateStatusDto.description,
+          edittedAt: new Date(),
+        },
+      });
+
+      // Immediately finish if no attachment changes
+      if (
+        newAttachments.length === 0 &&
+        updateStatusDto.removedAttachmentIds.length === 0
+      ) {
+        return { updatedStatus, attachments: existingAttachments };
+      }
+
+      // Upload new attachments
+      const createdAttachments = await this.uploadMultipleAttachments(
+        newAttachments,
+        statusToUpdate.id,
+        tx,
+      );
+
+      // Get existing attachments to delete
+      const attachmentsToDelete = existingAttachments.filter((att) => {
+        return updateStatusDto.removedAttachmentIds.includes(att.id);
+      });
+
+      // Delete attachments
+      await this.deleteMultipleAttachments(
+        attachmentsToDelete,
+        statusToUpdate.id,
+        tx,
+      );
+
+      return {
+        updatedStatus: updatedStatus,
+        attachments: [...createdAttachments, ...existingAttachments],
+      };
+    });
   }
 
   async delete(statusId: number, userId: number) {
@@ -351,16 +480,11 @@ export class StatusService {
         where: { statusId: statusToDelete.id },
       });
 
-      // Extract s3 object keys
-      const keys: string[] = attachments.map((attachment) => attachment.key);
-
-      // Delete attachments from db
-      await tx.attachment.deleteMany({
-        where: { statusId: statusToDelete.id },
-      });
-
-      // Delete s3 objects
-      await this.uploadService.deleteMany(keys);
+      const deletedCount = await this.deleteMultipleAttachments(
+        attachments,
+        statusToDelete.id,
+        tx,
+      );
 
       // Delete reposts and stars
       await tx.statusRepost.deleteMany({
@@ -379,7 +503,7 @@ export class StatusService {
 
       return {
         deletedStatus: statusToDelete.id,
-        deletedAttachmentsCount: keys.length,
+        deletedAttachmentsCount: deletedCount,
       };
     });
   }

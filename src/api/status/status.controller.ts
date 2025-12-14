@@ -7,10 +7,11 @@ import {
   Param,
   Delete,
   UseInterceptors,
-  UploadedFile,
   ValidationPipe,
   UploadedFiles,
   ParseIntPipe,
+  UseGuards,
+  Req,
 } from '@nestjs/common';
 import { StatusService } from './status.service';
 import { CreateStatusDto } from './dto/create-status.dto';
@@ -18,6 +19,9 @@ import { UpdateStatusDto } from './dto/update-status.dto';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { AttachmentValidationPipe } from './pipes/attachment-validation.pipe';
 import { RequestService } from 'src/request/request.service';
+import { StatusOwnerGuard } from './guards/status-owner.guard';
+import { Status } from 'generated/prisma';
+import { CONSTANTS } from 'src/shared/constants';
 
 @Controller('status')
 export class StatusController {
@@ -27,7 +31,9 @@ export class StatusController {
   ) {}
 
   @Post()
-  @UseInterceptors(FilesInterceptor('attachments', 4))
+  @UseInterceptors(
+    FilesInterceptor('attachments', CONSTANTS.MAX_IMAGE_ATTACHMENTS_LENGTH),
+  )
   create(
     @Body(ValidationPipe) createStatusDto: CreateStatusDto,
     @UploadedFiles(new AttachmentValidationPipe())
@@ -50,14 +56,24 @@ export class StatusController {
     return this.statusService.findOne(id);
   }
 
+  @UseGuards(StatusOwnerGuard)
+  @UseInterceptors(
+    FilesInterceptor('attachments', CONSTANTS.MAX_IMAGE_ATTACHMENTS_LENGTH),
+  )
   @Patch(':id')
   update(
-    @Param('id', ParseIntPipe) id: number,
+    @Req() req,
     @Body() updateStatusDto: UpdateStatusDto,
+    @UploadedFiles(new AttachmentValidationPipe())
+    attachments: Express.Multer.File[],
   ) {
-    const user = this.requestService.getUser();
+    const statusToUpdate = req.status as Status;
 
-    return this.statusService.update(id, updateStatusDto, user.id);
+    return this.statusService.update(
+      statusToUpdate,
+      updateStatusDto,
+      attachments,
+    );
   }
 
   @Delete(':id')
