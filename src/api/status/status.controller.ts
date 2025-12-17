@@ -53,7 +53,9 @@ export class StatusController {
 
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.statusService.findOne(id);
+    const user = this.requestService.getUser();
+
+    return this.statusService.findOne(id, user.id);
   }
 
   @UseGuards(StatusOwnerGuard)

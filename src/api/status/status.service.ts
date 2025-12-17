@@ -18,6 +18,10 @@ import EnvironmentVariables from 'src/shared/env-variables';
 import { getSignedUrl } from '@aws-sdk/cloudfront-signer';
 import { CONSTANTS } from 'src/shared/constants';
 
+type PopulatedStatus = Prisma.StatusGetPayload<{
+  include: ReturnType<StatusService['getStatusQueryInclude']>;
+}>;
+
 export interface AttachmentWithKey {
   key: string;
   attachment: Express.Multer.File;
@@ -36,6 +40,121 @@ export class StatusService {
 
   private readonly URL_CACHE_PERCENTAGE = 0.8; // 80%
   private readonly URL_CACHE_LIFETIME = 5; // In minutes
+
+  /**
+   * Build the standard status query include object
+   * @returns {Prisma.StatusInclude} Reusable include configuration for status queries
+   */
+  private getStatusQueryInclude(): Prisma.StatusInclude {
+    return {
+      user: {
+        select: {
+          id: true,
+          username: true,
+          email: true,
+          switchType: true,
+        },
+      },
+      attachments: {
+        select: {
+          id: true,
+          key: true,
+          createdAt: true,
+        },
+      },
+      _count: {
+        select: {
+          stars: true, // Star count
+          reposts: true, // Repost count
+          comments: true, // Comment count (replies)
+        },
+      },
+    };
+  }
+
+  /**
+   * @param {PopulatedStatus[]} statuses - Populated statuses that we want to attach signed URLs to
+   * @param {number} userId - Id of the current user
+   * @returns {Promise<PopulatedStatus[]>} Populated statuses with attached signed URLs
+   */
+  private async attachSignedUrls(
+    statuses: PopulatedStatus[],
+    userId: number,
+  ): Promise<PopulatedStatus[]> {
+    const allAttachmentKeys: string[] = [];
+    statuses.forEach((status) => {
+      status.attachments.forEach((attachment) => {
+        allAttachmentKeys.push(attachment.key);
+      });
+    });
+
+    const signedUrlMap = await this.generateBatchSignedUrls(
+      allAttachmentKeys,
+      userId,
+    );
+
+    return statuses.map((status) => ({
+      ...status,
+      attachments: status.attachments.map((attachment) => ({
+        ...attachment,
+        signedUrl: signedUrlMap[attachment.key],
+      })),
+    }));
+  }
+
+  /**
+   * @param {number} statusId - Id of the status we want to get and enrich
+   * @param {number} userId - Id of the current user
+   * @param {boolean} throwError - True if we want to throw error if not found, false if not (defaults to false)
+   * @returns {Promise<PopulatedStatus | null>} Status with populated fields and signed URLs or Null if not found
+   */
+  private async getAndEnrichStatus(
+    statusId: number,
+    userId: number,
+    throwError: boolean = false,
+  ): Promise<PopulatedStatus | null> {
+    let status: PopulatedStatus | null =
+      await this.prismaService.status.findUnique({
+        where: {
+          id: statusId,
+        },
+        include: this.getStatusQueryInclude(),
+      });
+
+    if (!status) {
+      if (throwError) {
+        throw new NotFoundException('Status not found');
+      }
+
+      return null;
+    }
+
+    status = (await this.attachSignedUrls([status], userId))[0];
+    return status;
+  }
+
+  /**
+   * @param {Omit<Prisma.StatusFindManyArgs, 'include'>} args - The arguments to be used for the query, exluding the 'include' since we have a constant for that
+   * @param {number} userId - Id of the current user
+   * @returns {Promise<PopulatedStatus[]>} Statuses with populated fields and signed URLs
+   */
+  private async getAndEnrichMultipleStatus(
+    args: Omit<Prisma.StatusFindManyArgs, 'include'>,
+    userId: number,
+  ): Promise<PopulatedStatus[]> {
+    let statuses: PopulatedStatus[] = await this.prismaService.status.findMany({
+      ...args,
+      include: this.getStatusQueryInclude(),
+    });
+
+    // Skip attaching signed url if no status found
+    if (statuses.length === 0) {
+      return statuses;
+    }
+
+    statuses = await this.attachSignedUrls(statuses, userId);
+    return statuses;
+  }
 
   /**
    * @param {number} statusId - The id of the status the attachment is for
@@ -304,80 +423,43 @@ export class StatusService {
   }
 
   async findAll(userId: number) {
-    const statuses = await this.prismaService.status.findMany({
-      where: {
-        parentId: null, // Only top-level statuses
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            username: true,
-            email: true,
-            switchType: true,
-          },
+    const statuses: PopulatedStatus[] = await this.getAndEnrichMultipleStatus(
+      {
+        where: {
+          parentId: null, // Only top-level statuses
         },
-        attachments: {
-          select: {
-            id: true,
-            key: true,
-            createdAt: true,
-          },
-        },
-        _count: {
-          select: {
-            stars: true, // Star count
-            reposts: true, // Repost count
-            comments: true, // Comment count (replies)
-          },
+        orderBy: {
+          createdAt: 'desc', // Latest first
         },
       },
-      orderBy: {
-        createdAt: 'desc', // Latest first
-      },
-    });
-
-    const allAttachmentKeys: string[] = [];
-    statuses.forEach((status) => {
-      status.attachments.forEach((attachment) => {
-        allAttachmentKeys.push(attachment.key);
-      });
-    });
-
-    const signedUrlMap = await this.generateBatchSignedUrls(
-      allAttachmentKeys,
       userId,
     );
 
-    return statuses.map((status) => ({
-      ...status,
-      attachments: status.attachments.map((attachment) => ({
-        ...attachment,
-        signedUrl: signedUrlMap[attachment.key],
-      })),
-    }));
+    return statuses;
   }
 
-  async findOne(id: number) {
-    const status: Status | null = await this.prismaService.status.findUnique({
-      where: { id: id },
-    });
-
-    if (!status) {
-      throw new NotFoundException('Status not found');
-    }
+  async findOne(statusId: number, userId: number) {
+    const status: PopulatedStatus = await this.getAndEnrichStatus(
+      statusId,
+      userId,
+      true,
+    );
 
     // The status that the current status MIGHT be replying to
-    const parentStatus: Status | null = status.parentId
-      ? await this.prismaService.status.findUnique({
-          where: { id: status.parentId },
-        })
+    const parentStatus: PopulatedStatus | null = status.parentId
+      ? await this.getAndEnrichStatus(status.parentId, userId)
       : null;
 
     // Replies
-    const childrenStatuses: Status[] = await this.prismaService.status.findMany(
-      { where: { parentId: id } },
-    );
+    const childrenStatuses: PopulatedStatus[] =
+      await this.getAndEnrichMultipleStatus(
+        {
+          where: {
+            parentId: statusId,
+          },
+        },
+        statusId,
+      );
 
     return {
       status,
