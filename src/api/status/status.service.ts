@@ -18,9 +18,15 @@ import EnvironmentVariables from 'src/shared/env-variables';
 import { getSignedUrl } from '@aws-sdk/cloudfront-signer';
 import { CONSTANTS } from 'src/shared/constants';
 
-type PopulatedStatus = Prisma.StatusGetPayload<{
+type RawStatus = Prisma.StatusGetPayload<{
   include: ReturnType<StatusService['getStatusQueryInclude']>;
 }>;
+
+export interface PopulatedStatus extends RawStatus {
+  isStarred: boolean;
+  isReposted: boolean;
+  isFollowing: boolean;
+}
 
 export interface AttachmentWithKey {
   key: string;
@@ -43,9 +49,10 @@ export class StatusService {
 
   /**
    * Build the standard status query include object
+   * @param {number} userId - Current user's ID to check relationships
    * @returns {Prisma.StatusInclude} Reusable include configuration for status queries
    */
-  private getStatusQueryInclude(): Prisma.StatusInclude {
+  private getStatusQueryInclude(userId: number): Prisma.StatusInclude {
     return {
       user: {
         select: {
@@ -53,6 +60,14 @@ export class StatusService {
           username: true,
           email: true,
           switchType: true,
+          followers: {
+            where: {
+              followerUserId: userId,
+            },
+            select: {
+              id: true,
+            },
+          },
         },
       },
       attachments: {
@@ -62,6 +77,22 @@ export class StatusService {
           createdAt: true,
         },
       },
+      stars: {
+        where: {
+          userId: userId,
+        },
+        select: {
+          id: true,
+        },
+      },
+      reposts: {
+        where: {
+          userId: userId,
+        },
+        select: {
+          id: true,
+        },
+      },
       _count: {
         select: {
           stars: true, // Star count
@@ -69,6 +100,28 @@ export class StatusService {
           comments: true, // Comment count (replies)
         },
       },
+    };
+  }
+
+  /**
+   * Transform status data to include boolean flags
+   * @param {RawStatus} status - Raw status from prisma query
+   * @returns {PopulatedStatus} Status with boolean flags
+   */
+  private populateStatusFlags(status: any): PopulatedStatus {
+    const { stars, reposts, user, ...rest } = status;
+
+    return {
+      ...rest,
+      user: {
+        ...user,
+        followers: undefined, // Remove from response
+      },
+      isStarred: stars.length > 0,
+      isReposted: reposts.length > 0,
+      isFollowing: user.followers.length > 0,
+      stars: undefined, // Remove from response
+      reposts: undefined, // Remove from response
     };
   }
 
@@ -113,15 +166,15 @@ export class StatusService {
     userId: number,
     throwError: boolean = false,
   ): Promise<PopulatedStatus | null> {
-    let status: PopulatedStatus | null =
+    let rawStatus: RawStatus | null =
       await this.prismaService.status.findUnique({
         where: {
           id: statusId,
         },
-        include: this.getStatusQueryInclude(),
+        include: this.getStatusQueryInclude(userId),
       });
 
-    if (!status) {
+    if (!rawStatus) {
       if (throwError) {
         throw new NotFoundException('Status not found');
       }
@@ -129,6 +182,7 @@ export class StatusService {
       return null;
     }
 
+    let status: PopulatedStatus = this.populateStatusFlags(rawStatus);
     status = (await this.attachSignedUrls([status], userId))[0];
     return status;
   }
@@ -142,16 +196,19 @@ export class StatusService {
     args: Omit<Prisma.StatusFindManyArgs, 'include'>,
     userId: number,
   ): Promise<PopulatedStatus[]> {
-    let statuses: PopulatedStatus[] = await this.prismaService.status.findMany({
+    let rawStatuses: RawStatus[] = await this.prismaService.status.findMany({
       ...args,
-      include: this.getStatusQueryInclude(),
+      include: this.getStatusQueryInclude(userId),
     });
 
-    // Skip attaching signed url if no status found
-    if (statuses.length === 0) {
-      return statuses;
+    // Skip post processing if no status found
+    if (rawStatuses.length === 0) {
+      return [];
     }
 
+    let statuses: PopulatedStatus[] = rawStatuses.map((rawStatus) =>
+      this.populateStatusFlags(rawStatus),
+    );
     statuses = await this.attachSignedUrls(statuses, userId);
     return statuses;
   }
