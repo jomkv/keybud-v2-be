@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -79,34 +79,51 @@ export class UserService {
     return `This action removes a #${id} user`;
   }
 
-  async follow(userId: number, recipientUserId: number) {
+  async follow(followerId: number, followingId: number) {
     const existingFollow: UserFollow | null =
       await this.prismaService.userFollow.findFirst({
         where: {
-          followerUserId: userId,
-          followingUserId: recipientUserId,
+          followerUserId: followerId,
+          followingUserId: followingId,
         },
       });
 
     if (existingFollow) {
-      // Unfollow
-      await this.prismaService.userFollow.delete({
-        where: {
-          id: existingFollow.id,
-        },
-      });
-    } else {
-      // Follow
-      await this.prismaService.userFollow.create({
-        data: {
-          followerUserId: userId,
-          followingUserId: recipientUserId,
-        },
-      });
+      throw new BadRequestException('Invalid action');
     }
 
+    await this.prismaService.userFollow.create({
+      data: {
+        followerUserId: followerId,
+        followingUserId: followingId,
+      },
+    });
+
     return {
-      message: `User #${recipientUserId} ${existingFollow ? 'Unfollowed' : 'Followed'}`,
+      message: `User #${followingId} Followed`,
+    };
+  }
+
+  async unfollow(followerId: number, followingId: number) {
+    const existingFollow = await this.prismaService.userFollow.findFirst({
+      where: {
+        followerUserId: followerId,
+        followingUserId: followingId,
+      },
+    });
+
+    if (!existingFollow) {
+      throw new BadRequestException('Invalid action');
+    }
+
+    await this.prismaService.userFollow.delete({
+      where: {
+        id: existingFollow.id,
+      },
+    });
+
+    return {
+      message: `User #${followingId} Unfollowed'`,
     };
   }
 

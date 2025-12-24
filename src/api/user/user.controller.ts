@@ -48,19 +48,25 @@ export class UserController {
     return this.userService.update(+id, updateUserDto);
   }
 
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.userService.remove(+id);
-  }
-
   @Post('follow/:id')
   follow(@Param('id', ParseIntPipe) id: number) {
     const user = this.requestService.getUser();
 
     if (user.id === id) {
-      throw new BadRequestException('You cannot follow/unfollow yourself');
+      throw new BadRequestException('Invalid action');
     }
 
     return this.userService.follow(user.id, id);
+  }
+
+  @Delete('unfollow/:id')
+  unfollow(@Param('id', ParseIntPipe) id: number) {
+    const user = this.requestService.getUser();
+
+    if (user.id === id) {
+      throw new BadRequestException('Invalid action');
+    }
+
+    return this.userService.unfollow(user.id, id);
   }
 }
