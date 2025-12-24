@@ -23,8 +23,8 @@ model User {
 
   // Relations
   setting                  UserSetting?
-  followers                UserFollow[]         @relation("UserFollows")
-  followings               UserFollow[]         @relation("UserFollowing")
+  followers                UserFollow[]         @relation("UserFollowing")
+  followings               UserFollow[]         @relation("UserFollows")
   statuses                 Status[]
   stars                    StatusStar[]
   reposts                  StatusRepost[]
@@ -51,8 +51,8 @@ model UserFollow {
   followingUserId Int
 
   // Relations
-  followerUser  User @relation("UserFollows", fields: [followerUserId], references: [id])
-  followingUser User @relation("UserFollowing", fields: [followingUserId], references: [id])
+  followerUser  User @relation("UserFollows", fields: [followerUserId], references: [id]) // Person doing the following
+  followingUser User @relation("UserFollowing", fields: [followingUserId], references: [id]) // Person being followed
 }
 
 model Status {
