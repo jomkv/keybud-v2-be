@@ -515,7 +515,7 @@ export class StatusService {
             parentId: statusId,
           },
         },
-        statusId,
+        userId,
       );
 
     return {
