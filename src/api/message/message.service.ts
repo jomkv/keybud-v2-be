@@ -262,7 +262,6 @@ export class MessageService {
 
       await this.messageGateway.emitNewMessageToUsers(newMessage, userIds);
     } catch (error) {
-      console.log('here', error);
       // Do nothing
     }
   }
