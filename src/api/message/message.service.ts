@@ -12,12 +12,14 @@ import { PrismaClientKnownRequestError } from 'generated/prisma/runtime/library'
 import { Message } from 'generated/prisma';
 import { RedisService } from 'src/redis/redis.service';
 import { MessageCursorKey } from 'src/shared/types/redis';
+import { MessageGateway } from './gateways/message.gateway';
 
 @Injectable()
 export class MessageService {
   constructor(
     private readonly prismaService: PrismaService,
     private readonly redisService: RedisService,
+    private readonly messageGateway: MessageGateway,
   ) {}
 
   private readonly PAGINATION_LIMIT = 15;
@@ -206,17 +208,29 @@ export class MessageService {
    * const messageDto = { content: "Hello world!", conversationId: "123" };
    * const newMessage = await create(messageDto, 456);
    */
-  async create(createMessageDto: CreateMessageDto, senderId: number) {
+  async create(
+    createMessageDto: CreateMessageDto,
+    senderId: number,
+  ): Promise<Message> {
     const encryptedContent = this.encryptContent(createMessageDto.content);
 
     try {
-      return await this.prismaService.message.create({
+      const newMessage = await this.prismaService.message.create({
         data: {
           content: encryptedContent,
           conversationId: +createMessageDto.conversationId,
           senderId: senderId,
         },
       });
+
+      const rawNewMessage = {
+        ...newMessage,
+        content: createMessageDto.content,
+      };
+
+      await this.emitNewMessage(rawNewMessage);
+
+      return rawNewMessage;
     } catch (error) {
       if (
         error instanceof PrismaClientKnownRequestError &&
@@ -226,6 +240,30 @@ export class MessageService {
       }
 
       throw error;
+    }
+  }
+
+  async emitNewMessage(newMessage: Message): Promise<void> {
+    try {
+      const conversationMembers =
+        await this.prismaService.conversation.findUnique({
+          where: {
+            id: newMessage.conversationId,
+          },
+          select: {
+            members: true,
+          },
+        });
+
+      // Convert userIds to their equivalent redis User->Socket key
+      const userIds = conversationMembers.members.map(
+        (member) => member.userId,
+      );
+
+      await this.messageGateway.emitNewMessageToUsers(newMessage, userIds);
+    } catch (error) {
+      console.log('here', error);
+      // Do nothing
     }
   }
 }
