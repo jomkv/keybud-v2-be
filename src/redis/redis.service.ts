@@ -22,6 +22,8 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     value: string,
     ttlInSeconds: number = 300,
   ): Promise<void> {
+    console.log(`SET ${key} = ${value}`);
+
     await this.client.set(key, value, 'EX', ttlInSeconds);
   }
 
@@ -29,7 +31,13 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     return this.client.get(key);
   }
 
+  async getMany(keys: string[]): Promise<string[]> {
+    return this.client.mget(keys);
+  }
+
   async delete(key: string): Promise<number> {
+    console.log(`DELETE ${key}`);
+
     return this.client.del(key);
   }
 }

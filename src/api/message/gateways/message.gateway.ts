@@ -1,7 +1,6 @@
 import {
   ConnectedSocket,
   MessageBody,
-  OnGatewayConnection,
   OnGatewayDisconnect,
   SubscribeMessage,
   WebSocketGateway,
@@ -11,11 +10,11 @@ import { Message } from 'generated/prisma';
 import { Server, Socket } from 'socket.io';
 import { RedisService } from 'src/redis/redis.service';
 import { REDIS_KEYS } from 'src/shared/redis-keys';
-
-export const MESSAGE_MESSAGES = {
-  SUBSCRIBE: 'message:subscribe', // client subscribes to our io
-  NEW_MESSAGE: 'message:new', // new message was sent
-};
+import {
+  MESSAGE_EVENT_NAMES,
+  MessageClientToServerEvents,
+  MessageServerToClientEvents,
+} from '@jomkv/keybud-v2-contracts';
 
 @WebSocketGateway({
   namespace: 'message',
@@ -23,7 +22,7 @@ export const MESSAGE_MESSAGES = {
 })
 export class MessageGateway implements OnGatewayDisconnect {
   @WebSocketServer()
-  server: Server;
+  server: Server<MessageClientToServerEvents, MessageServerToClientEvents>;
 
   constructor(private readonly redisService: RedisService) {}
 
@@ -35,7 +34,7 @@ export class MessageGateway implements OnGatewayDisconnect {
     }
   }
 
-  @SubscribeMessage(MESSAGE_MESSAGES.SUBSCRIBE)
+  @SubscribeMessage(MESSAGE_EVENT_NAMES.SUBSCRIBE)
   async handleSessionRegister(
     @ConnectedSocket() socket: Socket,
     @MessageBody('userId') userId: string,
@@ -122,7 +121,9 @@ export class MessageGateway implements OnGatewayDisconnect {
     try {
       const socketIds: string[] = await this.getSocketsByUsers(userIds);
 
-      this.server.to(socketIds).emit(MESSAGE_MESSAGES.NEW_MESSAGE, newMessage);
+      this.server
+        .to(socketIds)
+        .emit(MESSAGE_EVENT_NAMES.NEW_MESSAGE, newMessage);
 
       return true;
     } catch (error) {

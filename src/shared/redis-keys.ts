@@ -4,5 +4,8 @@ export const REDIS_KEYS = {
       `attachment:signed_url:${userId}:${Buffer.from(objectKey).toString('base64')}`,
   },
 
-  // ... other modules
+  MESSAGE: {
+    USER_TO_SOCKET: (userId: number) => `message:user:${userId}`,
+    SOCKET_TO_USER: (socketId: string) => `message:socket:${socketId}`,
+  },
 } as const;
