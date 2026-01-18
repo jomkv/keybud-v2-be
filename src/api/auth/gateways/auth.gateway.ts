@@ -9,12 +9,11 @@ import {
 import { Server, Socket } from 'socket.io';
 import { RedisService } from 'src/redis/redis.service';
 import { AuthSessionKey, AuthSocketKey } from 'src/shared/types/redis';
-
-export const AUTH_MESSAGES = {
-  REGISTER: 'auth:subscribe', // client subscribes to our io
-  REGISTER_SUCCESS: 'auth:subscribe_success', // inform client that subscription is successful
-  COMPLETE: 'auth:complete', // client completes login
-};
+import {
+  AUTH_EVENT_NAMES,
+  AuthClientToServerEvents,
+  AuthServerToClientEvents,
+} from '@jomkv/keybud-v2-contracts';
 
 export const REDIS_KEYS = {
   SOCKET: (socketId: string): AuthSocketKey => `auth:socket:${socketId}`,
@@ -27,7 +26,7 @@ export const REDIS_KEYS = {
 })
 export class AuthGateway implements OnGatewayDisconnect {
   @WebSocketServer()
-  server: Server;
+  server: Server<AuthClientToServerEvents, AuthServerToClientEvents>;
 
   constructor(private readonly redisService: RedisService) {}
 
@@ -39,7 +38,7 @@ export class AuthGateway implements OnGatewayDisconnect {
     }
   }
 
-  @SubscribeMessage(AUTH_MESSAGES.REGISTER)
+  @SubscribeMessage(AUTH_EVENT_NAMES.SUBSCRIBE)
   async handleSessionRegister(
     @ConnectedSocket() socket: Socket,
     @MessageBody('sessionId') sessionId: string,
@@ -52,7 +51,9 @@ export class AuthGateway implements OnGatewayDisconnect {
 
     console.info(`Session Started: ${sessionId}`);
 
-    socket.emit(AUTH_MESSAGES.REGISTER_SUCCESS, { sessionId });
+    this.server
+      .to(socket.id)
+      .emit(AUTH_EVENT_NAMES.SUBSCRIBE_SUCCESS, { sessionId });
   }
 
   /**
@@ -86,18 +87,12 @@ export class AuthGateway implements OnGatewayDisconnect {
   }
 
   /**
-   * Emit a message to a specific session
+   * Emit auth complete
    *
    * @param {string} sessionId - The sessionId to emit message to
-   * @param {string} event - The event name to emit
-   * @param {any} data - The data to send
    * @returns {Promise<boolean>} True if message was sent successfully
    */
-  public async emitToSession(
-    sessionId: string,
-    event: string,
-    data: any,
-  ): Promise<boolean> {
+  public async emitComplete(sessionId: string): Promise<boolean> {
     try {
       const socketId: string | null = await this.getSocketBySession(sessionId);
 
@@ -106,7 +101,7 @@ export class AuthGateway implements OnGatewayDisconnect {
         return false;
       }
 
-      this.server.to(socketId).emit(event, data);
+      this.server.to(socketId).emit(AUTH_EVENT_NAMES.COMPLETE);
       await this.cleanupSession(sessionId, socketId);
       return true;
     } catch (error) {

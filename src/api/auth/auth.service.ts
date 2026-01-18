@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { RedisService } from 'src/redis/redis.service';
-import { AUTH_MESSAGES, AuthGateway } from './gateways/auth.gateway';
+import { AuthGateway } from './gateways/auth.gateway';
 import { UserService } from '../user/user.service';
 import { AuthInput, AuthResult, TokenPayload } from 'src/shared/types/auth';
 import { User } from 'generated/prisma';
@@ -82,6 +82,6 @@ export class AuthService {
       return;
     }
 
-    await this.authGateway.emitToSession(sessionId, AUTH_MESSAGES.COMPLETE, {});
+    await this.authGateway.emitComplete(sessionId);
   }
 }
