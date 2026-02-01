@@ -4,7 +4,7 @@ import { RedisService } from 'src/redis/redis.service';
 import { AuthGateway } from './gateways/auth.gateway';
 import { UserService } from '../user/user.service';
 import { AuthInput, AuthResult, TokenPayload } from 'src/shared/types/auth';
-import { User } from 'generated/prisma';
+import { User } from '@prisma/client';
 import EnvironmentVariables from 'src/shared/env-variables';
 import { AuthNonceKey } from 'src/shared/types/redis';
 

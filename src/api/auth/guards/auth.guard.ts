@@ -11,7 +11,7 @@ import { UserService } from 'src/api/user/user.service';
 import { RequestService } from 'src/request/request.service';
 import EnvironmentVariables from 'src/shared/env-variables';
 import { TokenPayload } from 'src/shared/types/auth';
-import { User } from 'generated/prisma';
+import { User } from '@prisma/client';
 import { Reflector } from '@nestjs/core';
 import { IS_PUBLIC_KEY } from 'src/shared/decorators/public.decorator';
 

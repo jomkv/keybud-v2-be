@@ -6,12 +6,14 @@ import EnvironmentVariables from 'src/shared/env-variables';
 @Injectable()
 export class GoogleStrategy extends PassportStrategy(Strategy) {
   constructor() {
-    super({
+    const config = {
       clientID: EnvironmentVariables.clientId,
       clientSecret: EnvironmentVariables.clientSecret,
       callbackURL: `${EnvironmentVariables.baseUrl}/auth/google/redirect`,
       scope: ['profile', 'email', 'openid'],
-    });
+    };
+
+    super(config);
   }
 
   async validate(

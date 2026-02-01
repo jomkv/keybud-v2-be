@@ -8,8 +8,8 @@ import {
   createDecipheriv,
 } from 'crypto';
 import EnvironmentVariables from 'src/shared/env-variables';
-import { PrismaClientKnownRequestError } from 'generated/prisma/runtime/library';
-import { Message } from 'generated/prisma';
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/client';
+import { Message } from '@prisma/client';
 import { RedisService } from 'src/redis/redis.service';
 import { MessageCursorKey } from 'src/shared/types/redis';
 import { MessageGateway } from './gateways/message.gateway';

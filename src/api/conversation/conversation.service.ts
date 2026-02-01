@@ -1,8 +1,8 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { Conversation } from 'generated/prisma';
-import { PrismaClientKnownRequestError } from 'generated/prisma/runtime/library';
+import { Conversation } from '@prisma/client';
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/client';
 import { MessageService } from '../message/message.service';
 
 @Injectable()

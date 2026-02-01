@@ -68,6 +68,10 @@ class EnvironmentVariables {
   get cloudfrontPrivateKey(): string {
     return process.env.CLOUDFRONT_PRIVATE_KEY;
   }
+
+  get dbUrl(): string {
+    return process.env.DATABASE_URL;
+  }
 }
 
 export default new EnvironmentVariables();

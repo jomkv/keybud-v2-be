@@ -6,7 +6,7 @@ import {
   WebSocketGateway,
   WebSocketServer,
 } from '@nestjs/websockets';
-import { Message } from 'generated/prisma';
+import { Message } from '@prisma/client';
 import { Server, Socket } from 'socket.io';
 import { RedisService } from 'src/redis/redis.service';
 import { REDIS_KEYS } from 'src/shared/redis-keys';

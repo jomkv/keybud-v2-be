@@ -20,7 +20,7 @@ import { FilesInterceptor } from '@nestjs/platform-express';
 import { AttachmentValidationPipe } from './pipes/attachment-validation.pipe';
 import { RequestService } from 'src/request/request.service';
 import { StatusOwnerGuard } from './guards/status-owner.guard';
-import { Status } from 'generated/prisma';
+import { Status } from '@prisma/client';
 import { CONSTANTS } from 'src/shared/constants';
 
 @Controller('status')
