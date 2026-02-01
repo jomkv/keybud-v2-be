@@ -11,6 +11,7 @@ import EnvironmentVariables from './shared/env-variables';
 import { StatusModule } from './api/status/status.module';
 import { MessageModule } from './api/message/message.module';
 import { ConversationModule } from './api/conversation/conversation.module';
+import { SearchModule } from './api/search/search.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { ConversationModule } from './api/conversation/conversation.module';
     StatusModule,
     MessageModule,
     ConversationModule,
+    SearchModule,
   ],
   controllers: [AppController],
   providers: [
