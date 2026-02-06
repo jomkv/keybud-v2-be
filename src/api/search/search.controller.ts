@@ -1,6 +1,7 @@
 import { Controller, Get, Query, ValidationPipe } from '@nestjs/common';
 import { SearchService } from './search.service';
 import { SearchQueryDto } from './dtos/search-query.dto';
+import { GetSuggestedDto } from './dtos/get-suggested.dto';
 
 @Controller('search')
 export class SearchController {
@@ -38,6 +39,22 @@ export class SearchController {
     query: SearchQueryDto,
   ) {
     return this.searchService.searchUsers(query.searchQuery);
+  }
+
+  @Get('suggested/user')
+  getSuggestedUsers(
+    @Query(
+      new ValidationPipe({
+        transform: true,
+        transformOptions: { enableImplicitConversion: true },
+        forbidNonWhitelisted: true,
+      }),
+    )
+    query: GetSuggestedDto,
+  ) {
+    const limit = query.limit ?? 5;
+
+    return this.searchService.searchSuggestedUsers(limit);
   }
 
   @Get('status')

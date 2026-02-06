@@ -5,6 +5,14 @@ import { PrismaService } from 'src/prisma/prisma.service';
 export class SearchService {
   constructor(private readonly prismaService: PrismaService) {}
 
+  searchSuggestedUsers(limit: number) {
+    return this.prismaService.$queryRaw`
+    SELECT * FROM "User"
+    ORDER BY RANDOM()
+    LIMIT ${limit}
+  `;
+  }
+
   searchUsers(searchQuery: string) {
     return this.prismaService.user.findMany({
       where: {

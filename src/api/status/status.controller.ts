@@ -65,7 +65,7 @@ export class StatusController {
   @Patch(':id')
   update(
     @Req() req,
-    @Body() updateStatusDto: UpdateStatusDto,
+    @Body(ValidationPipe) updateStatusDto: UpdateStatusDto,
     @UploadedFiles(new AttachmentValidationPipe())
     attachments: Express.Multer.File[],
   ) {
