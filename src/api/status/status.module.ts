@@ -10,5 +10,6 @@ import { RedisModule } from 'src/redis/redis.module';
   imports: [PrismaModule, UploadModule, RequestModule, RedisModule],
   controllers: [StatusController],
   providers: [StatusService],
+  exports: [StatusService],
 })
 export class StatusModule {}

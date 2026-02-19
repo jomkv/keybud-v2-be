@@ -192,7 +192,7 @@ export class StatusService {
    * @param {number} userId - Id of the current user
    * @returns {Promise<PopulatedStatus[]>} Statuses with populated fields and signed URLs
    */
-  private async getAndEnrichMultipleStatus(
+  public async getAndEnrichMultipleStatus(
     args: Omit<Prisma.StatusFindManyArgs, 'include'>,
     userId: number,
   ): Promise<PopulatedStatus[]> {

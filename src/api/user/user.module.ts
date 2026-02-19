@@ -3,9 +3,10 @@ import { UserService } from './user.service';
 import { UserController } from './user.controller';
 import { PrismaModule } from 'src/prisma/prisma.module';
 import { RequestModule } from 'src/request/request.module';
+import { StatusModule } from '../status/status.module';
 
 @Module({
-  imports: [PrismaModule, RequestModule],
+  imports: [PrismaModule, RequestModule, StatusModule],
   controllers: [UserController],
   providers: [UserService],
   exports: [UserService],

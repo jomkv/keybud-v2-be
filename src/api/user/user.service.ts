@@ -4,10 +4,14 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { Prisma, User, UserFollow } from '@prisma/client';
 import { AuthInput } from 'src/shared/types/auth';
+import { PopulatedStatus, StatusService } from '../status/status.service';
 
 @Injectable()
 export class UserService {
-  constructor(private readonly prismaService: PrismaService) {}
+  constructor(
+    private readonly prismaService: PrismaService,
+    private readonly statusService: StatusService,
+  ) {}
 
   private getUserQueryInclude(): Prisma.UserInclude {
     return {
@@ -58,6 +62,12 @@ export class UserService {
     return this.prismaService.user.findUnique({
       where: { id },
       include: this.getUserQueryInclude(),
+    });
+  }
+
+  findByUsername(username: string): Promise<User | null> {
+    return this.prismaService.user.findUnique({
+      where: { username },
     });
   }
 
@@ -134,5 +144,123 @@ export class UserService {
       },
       include: this.getUserQueryInclude(),
     });
+  }
+
+  async getUserProfile(currUserId: number, profileUserId: number) {
+    const profileAllStatuses: PopulatedStatus[] =
+      await this.statusService.getAndEnrichMultipleStatus(
+        {
+          where: {
+            userId: profileUserId,
+          },
+          orderBy: {
+            createdAt: 'desc', // Latest first
+          },
+        },
+        currUserId,
+      );
+
+    const profileStars = await this.prismaService.statusStar.findMany({
+      where: {
+        userId: profileUserId,
+      },
+    });
+    const profileStarIds: number[] = profileStars.map((star) => star.statusId);
+
+    // Get all statuses from profileStarIds
+    const starStatuses: PopulatedStatus[] =
+      await this.statusService.getAndEnrichMultipleStatus(
+        {
+          where: {
+            id: { in: profileStarIds },
+          },
+          orderBy: {
+            createdAt: 'desc', // Latest first
+          },
+        },
+        currUserId,
+      );
+
+    // Filter only to statuses with no parentId
+    const statuses = profileAllStatuses.filter(
+      (status) => status.parentId == null,
+    );
+
+    // Filter only to statuses with a parentId
+    const commentStatuses = profileAllStatuses.filter(
+      (status) => status.parentId !== null,
+    );
+
+    // Filter only to statuses with attachments
+    const mediaStatuses = profileAllStatuses.filter(
+      (status) => status.attachments.length > 0,
+    );
+
+    return {
+      posts: statuses,
+      comments: commentStatuses,
+      media: mediaStatuses,
+      stars: starStatuses,
+    };
+  }
+
+  getUserPosts(currUserId: number, ownerId: number) {
+    return this.statusService.getAndEnrichMultipleStatus(
+      {
+        where: { userId: ownerId, parentId: null },
+        orderBy: {
+          createdAt: 'desc',
+        },
+      },
+      currUserId,
+    );
+  }
+
+  getUserComments(currUserId: number, ownerId: number) {
+    return this.statusService.getAndEnrichMultipleStatus(
+      {
+        where: { userId: ownerId, parentId: { not: null } },
+        orderBy: {
+          createdAt: 'desc',
+        },
+      },
+      currUserId,
+    );
+  }
+
+  async getUserMedia(currUserId: number, ownerId: number) {
+    const allUserStatuses: PopulatedStatus[] =
+      await this.statusService.getAndEnrichMultipleStatus(
+        {
+          where: { userId: ownerId },
+          orderBy: {
+            createdAt: 'desc',
+          },
+        },
+        currUserId,
+      );
+
+    return allUserStatuses.filter((status) => status.attachments.length > 0);
+  }
+
+  async getUserStars(currUserId: number, ownerId: number) {
+    const userStars = await this.prismaService.statusStar.findMany({
+      where: {
+        userId: ownerId,
+      },
+    });
+    const starIds: number[] = userStars.map((star) => star.statusId);
+
+    return await this.statusService.getAndEnrichMultipleStatus(
+      {
+        where: {
+          id: { in: starIds },
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+      },
+      currUserId,
+    );
   }
 }
