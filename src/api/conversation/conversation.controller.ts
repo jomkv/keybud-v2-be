@@ -9,6 +9,7 @@ import {
   NotFoundException,
   Query,
   ParseIntPipe,
+  Delete,
 } from '@nestjs/common';
 import { ConversationService } from './conversation.service';
 import { CreateConversationDto } from './dto/create-conversation.dto';
@@ -35,6 +36,22 @@ export class ConversationController {
     }
 
     return this.conversationService.create(createConversationDto, user.id);
+  }
+
+  @Delete(':id')
+  async delete(@Param('id', ParseIntPipe) id: number) {
+    const user = this.requestService.getUser();
+
+    const conversationToDelete = await this.conversationService.findOne(
+      id,
+      user.id,
+    );
+
+    if (!conversationToDelete) {
+      throw new NotFoundException('Conversation to delete not found');
+    }
+
+    return await this.conversationService.delete(id);
   }
 
   @Get()

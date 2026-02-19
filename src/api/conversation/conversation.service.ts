@@ -46,6 +46,24 @@ export class ConversationService {
     }
   }
 
+  async delete(conversationId: number): Promise<void> {
+    return await this.prismaService.$transaction(async (tx) => {
+      // Delete conversation members
+      await tx.conversationMember.deleteMany({
+        where: {
+          conversationId,
+        },
+      });
+
+      // Delete conversation
+      await tx.conversation.delete({
+        where: {
+          id: conversationId,
+        },
+      });
+    });
+  }
+
   async findAll(userId: number) {
     const conversations = await this.prismaService.conversation.findMany({
       where: { members: { some: { userId } } },
