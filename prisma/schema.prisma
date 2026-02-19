@@ -143,7 +143,7 @@ model ConversationMember {
   isAdmin        Boolean  @default(false)
 
   // Relations
-  conversation Conversation @relation(fields: [conversationId], references: [id])
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   user         User         @relation(fields: [userId], references: [id])
 
   @@unique([conversationId, userId])
